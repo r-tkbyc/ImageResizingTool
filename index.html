@@ -3,895 +3,626 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Image Resizer Draft - 650x528 JPG</title>
+  <title>商品画像リサイズ（650x528 / ICC / ZIP）</title>
   <style>
-    :root {
-      --bg: #0b0f14;
-      --panel: #0f1722;
-      --line: #22303e;
-      --text: #e6edf3;
-      --muted: #9fb0c0;
-      --accent: #62d6ff;
-      --warn: #ffcc66;
-      --err: #ff6b6b;
-      --ok: #64f59b;
+    :root{
+      --bg:#0b0f14; --panel:#111a24; --line:#22303e; --text:#e6edf3; --muted:#93a4b5;
+      --warn:#ffcc66; --err:#ff6b6b; --ok:#6bff95;
       --tile: 180px;
-      --gap: 10px;
-      --radius: 12px;
-      --btn-h: 34px;
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
-      background: var(--bg);
-      color: var(--text);
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Noto Sans JP,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    header h1{font-size:14px;margin:0}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    label{font-size:12px;color:var(--muted)}
+    input[type="text"]{height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:#0f1620;color:var(--text)}
+    input[type="file"]{font-size:12px;color:var(--muted)}
+    button{
+      height:30px;padding:0 12px;border:1px solid var(--line);border-radius:10px;
+      background:#132033;color:var(--text);cursor:pointer
     }
-    header {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
-      position: sticky;
-      top: 0;
-      z-index: 5;
-      backdrop-filter: blur(8px);
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .container{padding:14px;display:grid;gap:12px}
+    .drop{
+      border:1px dashed #3a4b5f;border-radius:14px;padding:16px;background:rgba(17,26,36,.6);
+      display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap
     }
-    header .row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .left, .right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      color: var(--muted);
-      font-size: 12px;
-      background: rgba(255,255,255,0.03);
-    }
-    .field {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 6px 10px;
-      background: rgba(255,255,255,0.03);
-    }
-    .field label { font-size: 12px; color: var(--muted); }
-    .field input[type="text"]{
-      width: 170px;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--text);
-      font-size: 14px;
-    }
-    .btn {
-      height: var(--btn-h);
-      padding: 0 12px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .btn:hover { border-color: rgba(98,214,255,0.45); }
-    .btn.primary {
-      border-color: rgba(98,214,255,0.55);
-      background: rgba(98,214,255,0.12);
-    }
-    .btn.danger {
-      border-color: rgba(255,107,107,0.55);
-      background: rgba(255,107,107,0.12);
-    }
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    main { padding: 16px; }
-    .dropzone {
-      border: 1px dashed rgba(98,214,255,0.55);
-      border-radius: var(--radius);
-      padding: 18px;
-      background: rgba(98,214,255,0.06);
-      color: var(--muted);
-      margin-bottom: 14px;
-    }
-    .dropzone strong { color: var(--text); }
-    .grid {
-      display: grid;
+    .drop strong{font-size:13px}
+    .drop span{font-size:12px;color:var(--muted)}
+    .grid{
+      display:grid;
       grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr));
-      gap: var(--gap);
+      gap:12px
     }
-    .tile {
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      overflow: hidden;
-      background: rgba(255,255,255,0.03);
-      position: relative;
-      user-select: none;
+    .card{
+      border:1px solid var(--line);border-radius:14px;background:var(--panel);
+      overflow:hidden;position:relative
     }
-    .tile.dragging { opacity: 0.6; outline: 2px solid rgba(98,214,255,0.6); }
-    .thumb {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      background: #0a0f17;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
+    .thumb{
+      width:100%;height:140px;background:#0f1620;display:flex;align-items:center;justify-content:center;
+      border-bottom:1px solid var(--line)
     }
-    .thumb img, .thumb canvas {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: white;
+    .thumb img, .thumb canvas{max-width:100%;max-height:100%;display:block}
+    .meta{padding:10px;display:grid;gap:6px}
+    .fname{font-size:12px;line-height:1.2;word-break:break-all}
+    .badges{display:flex;gap:6px;flex-wrap:wrap}
+    .badge{
+      font-size:11px;border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--muted)
     }
-    .meta {
-      padding: 10px;
-      display: grid;
-      gap: 6px;
+    .badge.warn{border-color:rgba(255,204,102,.5);color:var(--warn)}
+    .badge.err{border-color:rgba(255,107,107,.5);color:var(--err)}
+    .badge.ok{border-color:rgba(107,255,149,.5);color:var(--ok)}
+    .seq{
+      position:absolute;left:10px;top:10px;background:rgba(0,0,0,.55);
+      border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:3px 8px;font-size:12px
     }
-    .name {
-      font-size: 12px;
-      color: var(--text);
-      word-break: break-all;
-      line-height: 1.25;
-      min-height: 32px;
+    .exclude{
+      position:absolute;right:10px;top:10px;display:flex;align-items:center;gap:6px;
+      background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:3px 8px;
+      font-size:12px
     }
-    .outname {
-      font-size: 12px;
-      color: var(--muted);
-      word-break: break-all;
-    }
-    .mini {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .status-pill {
-      position: absolute;
-      left: 10px;
-      top: 10px;
-      padding: 6px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      border: 1px solid var(--line);
-      background: rgba(0,0,0,0.35);
-      backdrop-filter: blur(6px);
-    }
-    .status-pill.ok { color: var(--ok); border-color: rgba(100,245,155,0.45); }
-    .status-pill.warn { color: var(--warn); border-color: rgba(255,204,102,0.45); }
-    .status-pill.err { color: var(--err); border-color: rgba(255,107,107,0.55); }
-    .warn-text, .err-text {
-      font-size: 11px;
-      line-height: 1.25;
-      padding: 8px 10px 10px;
-      border-top: 1px solid var(--line);
-      white-space: pre-wrap;
-    }
-    .warn-text { color: rgba(255,204,102,0.95); }
-    .err-text { color: rgba(255,107,107,0.95); }
-    .exclude {
-      position: absolute;
-      right: 10px;
-      top: 10px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 8px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(0,0,0,0.35);
-      backdrop-filter: blur(6px);
-      font-size: 11px;
-      color: var(--text);
-    }
-    .tile.excluded { opacity: 0.45; }
-    .progress {
-      width: 240px;
-      height: 10px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      overflow: hidden;
-      background: rgba(255,255,255,0.04);
-    }
-    .progress > div {
-      height: 100%;
-      width: 0%;
-      background: rgba(98,214,255,0.75);
-      transition: width 120ms linear;
-    }
-    .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
-    .kbd {
-      padding: 2px 6px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: rgba(255,255,255,0.04);
-      color: var(--text);
-      font-size: 12px;
+    .exclude input{width:14px;height:14px}
+    .small{font-size:12px;color:var(--muted)}
+    .footer{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .log{
+      border:1px solid var(--line);border-radius:14px;background:#0f1620;padding:10px;white-space:pre-wrap;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--muted)
     }
   </style>
 </head>
 <body>
-<header>
-  <div class="row">
-    <div class="left">
-      <div class="badge">出力: 650×528 / JPG 品質100 / 白余白 / PDFは先頭ページのみ(144dpi)</div>
-      <div class="field">
-        <label>固定名</label>
-        <input id="prefix" type="text" value="260120pickup" />
+  <header>
+    <h1>商品画像リサイズ（650×528 / JPEG Q100 / 144dpi / ICC→sRGB / ZIP）</h1>
+
+    <div class="row">
+      <label>固定名（ZIP名にも使用）</label>
+      <input id="prefix" type="text" value="260120pickup" />
+    </div>
+
+    <div class="row">
+      <label>sRGB ICC</label>
+      <input id="srgbIcc" type="file" accept=".icc,.icm,application/octet-stream" />
+      <label>Japan Color 2001 Coated ICC</label>
+      <input id="japanIcc" type="file" accept=".icc,.icm,application/octet-stream" />
+    </div>
+
+    <div class="row">
+      <button id="btnExport" disabled>ZIPを書き出し</button>
+      <button id="btnClear">クリア</button>
+      <span id="status" class="small">初期化中…</span>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="drop" class="drop">
+      <div>
+        <strong>ここに画像 / PDF をドラッグ＆ドロップ</strong><br />
+        <span>投入後にタイル表示 → 並び替え → 除外チェック → ZIP出力</span>
       </div>
-      <div class="badge" id="stats">全0 / 対象0 / 除外0 / WARN0 / ERROR0</div>
+      <div class="footer">
+        <span class="small">出力: 650×528 / 白余白 / Q100 / 144dpi / sRGB</span>
+      </div>
     </div>
-    <div class="right">
-      <div class="progress" title="変換進捗"><div id="bar"></div></div>
-      <button class="btn" id="btnWarnExclude">WARNだけ除外</button>
-      <button class="btn" id="btnAllClearExclude">除外を全解除</button>
-      <button class="btn danger" id="btnClear">全クリア</button>
-      <button class="btn primary" id="btnZip" disabled>ZIP出力</button>
-    </div>
+
+    <div id="grid" class="grid"></div>
+
+    <div id="log" class="log">Log:</div>
   </div>
-  <div class="hint">
-    追加: ドラッグ&ドロップ / 並べ替え: タイルをドラッグ / 除外: 右上チェック
-    （<span class="kbd">WARN</span> は「CMYK確定」または「色空間不明」）
-  </div>
-</header>
 
-<main>
-  <div class="dropzone" id="dropzone">
-    <strong>ここに画像 or PDF をドラッグ&ドロップ</strong>
-    <div class="hint">対応: JPG / PNG / WebP / PDF（複数ページでも先頭ページのみ）</div>
-  </div>
-  <div class="grid" id="grid"></div>
-</main>
+  <!-- SortableJS -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
-<!-- SortableJS -->
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-<!-- JSZip -->
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<!-- PDF.js -->
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
+  <!-- JSZip -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
-<script>
-(() => {
-  const TARGET_W = 650, TARGET_H = 528;
-  const JPEG_QUALITY = 1.0; // 品質100
-  const PDF_DPI = 144;
-  const PDF_SCALE = PDF_DPI / 72; // PDFは72dpi基準
+  <!-- pdf.js (ESM) + magick-wasm (ESM) -->
+  <script type="module">
+    import * as Magick from "https://cdn.jsdelivr.net/npm/@imagemagick/magick-wasm@0.0.37/dist/index.mjs";
+    import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs";
 
-  // pdf.js worker
-  if (window.pdfjsLib) {
+    // ---- constants ----
+    const TARGET_W = 650;
+    const TARGET_H = 528;
+    const OUT_DPI = 144;
+    const OUT_QUALITY = 100;
+
+    // pdf.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
-  }
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs";
 
-  const elGrid = document.getElementById("grid");
-  const elDrop = document.getElementById("dropzone");
-  const elStats = document.getElementById("stats");
-  const elPrefix = document.getElementById("prefix");
-  const elBar = document.getElementById("bar");
-  const btnZip = document.getElementById("btnZip");
-  const btnClear = document.getElementById("btnClear");
-  const btnWarnExclude = document.getElementById("btnWarnExclude");
-  const btnAllClearExclude = document.getElementById("btnAllClearExclude");
+    // ---- state ----
+    /** @type {{id:string, file:File, kind:"image"|"pdf", excluded:boolean, warnings:string[], info:{colorSpace?:string, hasIcc?:boolean}|null, thumbUrl?:string, thumbCanvas?:HTMLCanvasElement}[]} */
+    const items = [];
 
-  /** @type {Array<Tile>} */
-  let tiles = [];
+    let srgbProfile = null;       // Magick.ColorProfile
+    let japanProfile = null;      // Magick.ColorProfile
+    let magickReady = false;
 
-  /** @typedef {{
-    id: string,
-    kind: 'image'|'pdf',
-    file: File,
-    srcObjectUrl?: string,
-    thumbUrl?: string,
-    // 判定
-    status: 'ok'|'warn'|'error',
-    warnMsg?: string,
-    errMsg?: string,
-    colorInfo: 'RGB確定'|'CMYK確定'|'色空間不明',
-    pdfMultiPage?: boolean,
-    // UI
-    excluded: boolean,
-  }} Tile */
+    // ---- dom ----
+    const elGrid = document.getElementById("grid");
+    const elDrop = document.getElementById("drop");
+    const elPrefix = document.getElementById("prefix");
+    const elBtnExport = document.getElementById("btnExport");
+    const elBtnClear = document.getElementById("btnClear");
+    const elStatus = document.getElementById("status");
+    const elLog = document.getElementById("log");
+    const elSrgbIcc = document.getElementById("srgbIcc");
+    const elJapanIcc = document.getElementById("japanIcc");
 
-  // Sortable
-  const sortable = new Sortable(elGrid, {
-    animation: 150,
-    ghostClass: "dragging",
-    onEnd: () => {
-      // DOM順にtilesを並べ替え
-      const idOrder = [...elGrid.querySelectorAll(".tile")].map(n => n.dataset.id);
-      tiles.sort((a,b) => idOrder.indexOf(a.id) - idOrder.indexOf(b.id));
-      updateAll();
-    }
-  });
-
-  function uid() {
-    return Math.random().toString(16).slice(2) + Date.now().toString(16);
-  }
-
-  function pad(num, width) {
-    const s = String(num);
-    return s.length >= width ? s : "0".repeat(width - s.length) + s;
-  }
-
-  function serialWidth() {
-    // 「総タイル数」で判断（除外/ERROR含む）。100以上なら3桁で統一。
-    return (tiles.length >= 100) ? 3 : 2;
-  }
-
-  function plannedOutName(index1based) {
-    const prefix = (elPrefix.value || "260120pickup").trim();
-    const w = serialWidth();
-    return `${prefix}${pad(index1based, w)}.jpg`;
-  }
-
-  function zipName() {
-    const prefix = (elPrefix.value || "260120pickup").trim();
-    return `${prefix}.zip`;
-  }
-
-  function setProgress(pct) {
-    elBar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
-  }
-
-  function updateStats() {
-    const total = tiles.length;
-    const excluded = tiles.filter(t => t.excluded).length;
-    const warn = tiles.filter(t => t.status === "warn").length;
-    const err = tiles.filter(t => t.status === "error").length;
-    const target = tiles.filter(t => !t.excluded && t.status !== "error").length;
-    elStats.textContent = `全${total} / 対象${target} / 除外${excluded} / WARN${warn} / ERROR${err}`;
-    btnZip.disabled = (target === 0);
-  }
-
-  function updateAll() {
-    // 出力名や見た目を更新
-    const nodes = [...elGrid.querySelectorAll(".tile")];
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
-      const t = tiles.find(x => x.id === node.dataset.id);
-      if (!t) continue;
-
-      const out = plannedOutName(i + 1);
-      node.querySelector(".outname").textContent = `→ ${out}`;
-
-      node.classList.toggle("excluded", !!t.excluded);
-
-      const pill = node.querySelector(".status-pill");
-      pill.classList.remove("ok","warn","err");
-      pill.classList.add(t.status === "ok" ? "ok" : t.status === "warn" ? "warn" : "err");
-      pill.textContent = t.status.toUpperCase();
-
-      const msg = node.querySelector(".msg");
-      msg.textContent = (t.status === "warn") ? (t.warnMsg || "") :
-                        (t.status === "error") ? (t.errMsg || "") : "";
-      msg.className = "msg " + (t.status === "warn" ? "warn-text" : t.status === "error" ? "err-text" : "");
-      msg.style.display = (t.status === "ok") ? "none" : "block";
-
-      const info = node.querySelector(".colorinfo");
-      info.textContent = t.colorInfo + (t.kind === 'pdf' && t.pdfMultiPage ? " / 複数ページ(先頭のみ)" : "");
-
-      const chk = node.querySelector("input[type=checkbox]");
-      chk.checked = !!t.excluded;
-    }
-    updateStats();
-  }
-
-  function renderTile(t) {
-    const div = document.createElement("div");
-    div.className = "tile";
-    div.dataset.id = t.id;
-
-    div.innerHTML = `
-      <div class="thumb"><img alt="" /></div>
-      <div class="status-pill">...</div>
-      <label class="exclude" title="チェック=変換除外">
-        <input type="checkbox" />
-        除外
-      </label>
-      <div class="meta">
-        <div class="name"></div>
-        <div class="outname"></div>
-        <div class="mini">
-          <span class="colorinfo"></span>
-          <span class="kind"></span>
-        </div>
-      </div>
-      <div class="msg" style="display:none"></div>
-    `;
-
-    div.querySelector(".name").textContent = t.file.name;
-    div.querySelector(".kind").textContent = (t.kind === "pdf") ? "PDF" : (t.file.type || "IMAGE");
-
-    const img = div.querySelector("img");
-    img.src = t.thumbUrl || t.srcObjectUrl || "";
-
-    // exclude toggle
-    div.querySelector("input[type=checkbox]").addEventListener("change", (e) => {
-      t.excluded = e.target.checked;
-      updateAll();
-    });
-
-    elGrid.appendChild(div);
-  }
-
-  // Drag&Drop
-  ["dragenter","dragover"].forEach(evt => {
-    elDrop.addEventListener(evt, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      elDrop.style.borderColor = "rgba(98,214,255,0.95)";
-    });
-  });
-  ["dragleave","drop"].forEach(evt => {
-    elDrop.addEventListener(evt, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      elDrop.style.borderColor = "rgba(98,214,255,0.55)";
-    });
-  });
-
-  elDrop.addEventListener("drop", async (e) => {
-    const files = [...(e.dataTransfer?.files || [])];
-    if (!files.length) return;
-    await addFiles(files);
-  });
-
-  async function addFiles(files) {
-    setProgress(0);
-    for (let i=0; i<files.length; i++) {
-      const f = files[i];
-      await addOneFile(f);
-      setProgress(((i+1)/files.length)*100);
-    }
-    setProgress(0);
-    updateAll();
-  }
-
-  async function addOneFile(file) {
-    const nameLower = file.name.toLowerCase();
-    const isPdf = (file.type === "application/pdf") || nameLower.endsWith(".pdf");
-    const isImage = file.type.startsWith("image/") || /\.(jpg|jpeg|png|webp)$/i.test(nameLower);
-
-    const t = /** @type {Tile} */ ({
-      id: uid(),
-      kind: isPdf ? "pdf" : "image",
-      file,
-      status: "warn",
-      colorInfo: "色空間不明",
-      excluded: false
-    });
-
-    if (!isPdf && !isImage) {
-      t.status = "error";
-      t.errMsg = "ERROR: 未対応形式";
-      t.colorInfo = "色空間不明";
-      t.excluded = true; // 変換できないので除外ON
-      tiles.push(t);
-      renderTile(t);
-      return;
+    function log(msg){
+      elLog.textContent += "\\n" + msg;
+      elLog.scrollTop = elLog.scrollHeight;
     }
 
-    try {
-      if (isPdf) {
-        const { thumbUrl, multiPageFlag } = await makePdfThumb(file);
-        t.thumbUrl = thumbUrl;
-        t.pdfMultiPage = multiPageFlag;
-        // PDFは色空間判定が難しいので、ここではWARN固定（色重要）
-        t.status = "warn";
-        t.warnMsg = multiPageFlag
-          ? "WARN: PDFは複数ページの可能性（先頭ページのみ処理）\nWARN: 色空間不明（色が変わる可能性）"
-          : "WARN: 色空間不明（色が変わる可能性）";
-        t.colorInfo = "色空間不明";
-      } else {
-        // 画像：色判定（可能な範囲で）
-        const info = await inspectColorSpace(file);
-        t.colorInfo = info.label;
-        if (info.kind === "rgb") {
-          t.status = "ok";
-          t.warnMsg = "";
-        } else if (info.kind === "cmyk") {
-          t.status = "warn";
-          t.warnMsg = "WARN: CMYKの可能性（色が変わる可能性）";
-        } else {
-          t.status = "warn";
-          t.warnMsg = "WARN: 色空間不明（色が変わる可能性）";
-        }
-        t.thumbUrl = await makeImageThumb(file);
+    function setStatus(msg){ elStatus.textContent = msg; }
+
+    function pad(num, width){
+      const s = String(num);
+      return s.length >= width ? s : "0".repeat(width - s.length) + s;
+    }
+
+    function currentDigits(){
+      // 「入力総数」が100超えたら3桁（除外しても詰めない運用なので、総数基準にする）
+      return items.length >= 100 ? 3 : 2;
+    }
+
+    function refreshSeqBadges(){
+      const cards = [...elGrid.querySelectorAll(".card")];
+      const digits = currentDigits();
+      cards.forEach((card, idx)=>{
+        const seq = idx + 1;
+        const seqEl = card.querySelector(".seq");
+        if(seqEl) seqEl.textContent = pad(seq, digits);
+      });
+      // exportボタン
+      elBtnExport.disabled = !magickReady || items.length === 0;
+    }
+
+    function updateItemOrderFromDOM(){
+      const cards = [...elGrid.querySelectorAll(".card")];
+      const newOrder = [];
+      for(const card of cards){
+        const id = card.dataset.id;
+        const it = items.find(x=>x.id===id);
+        if(it) newOrder.push(it);
+      }
+      items.length = 0;
+      items.push(...newOrder);
+      refreshSeqBadges();
+    }
+
+    function makeCard(it){
+      const card = document.createElement("div");
+      card.className = "card";
+      card.dataset.id = it.id;
+
+      const seq = document.createElement("div");
+      seq.className = "seq";
+      seq.textContent = "??";
+
+      const exclude = document.createElement("label");
+      exclude.className = "exclude";
+      exclude.innerHTML = '<input type="checkbox" />除外';
+      const chk = exclude.querySelector("input");
+      chk.checked = it.excluded;
+      chk.addEventListener("change", ()=>{
+        it.excluded = chk.checked;
+        refreshSeqBadges(); // 連番は詰めないが、UI更新は必要
+      });
+
+      const thumb = document.createElement("div");
+      thumb.className = "thumb";
+      if(it.thumbCanvas){
+        thumb.appendChild(it.thumbCanvas);
+      }else{
+        const img = document.createElement("img");
+        img.alt = it.file.name;
+        img.src = it.thumbUrl || "";
+        thumb.appendChild(img);
       }
 
-      tiles.push(t);
-      renderTile(t);
-    } catch (err) {
-      t.status = "error";
-      t.errMsg = "ERROR: 読み込みに失敗（破損/非対応の可能性）";
-      t.excluded = true;
-      tiles.push(t);
-      renderTile(t);
-    }
-  }
+      const meta = document.createElement("div");
+      meta.className = "meta";
 
-  // 画像サムネ生成
-  async function makeImageThumb(file) {
-    const url = URL.createObjectURL(file);
-    const bmp = await createImageBitmap(file);
-    const canvas = document.createElement("canvas");
-    const size = 320;
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d", { alpha: false });
+      const fname = document.createElement("div");
+      fname.className = "fname";
+      fname.textContent = it.file.name;
 
-    // 白背景
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0,0,size,size);
+      const badges = document.createElement("div");
+      badges.className = "badges";
 
-    const scale = Math.min(size / bmp.width, size / bmp.height);
-    const w = Math.round(bmp.width * scale);
-    const h = Math.round(bmp.height * scale);
-    const x = Math.floor((size - w)/2);
-    const y = Math.floor((size - h)/2);
-    ctx.drawImage(bmp, x, y, w, h);
+      // kind badge
+      const bKind = document.createElement("span");
+      bKind.className = "badge";
+      bKind.textContent = it.kind.toUpperCase();
+      badges.appendChild(bKind);
 
-    bmp.close();
-    URL.revokeObjectURL(url);
-    return canvas.toDataURL("image/jpeg", 0.85);
-  }
+      // info badges
+      if(it.info){
+        const bCS = document.createElement("span");
+        bCS.className = "badge";
+        bCS.textContent = it.info.colorSpace ?? "Color: ?";
+        badges.appendChild(bCS);
 
-  // PDF先頭ページのサムネ生成（144dpi相当）
-  async function makePdfThumb(file) {
-    const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        const bICC = document.createElement("span");
+        bICC.className = "badge";
+        bICC.textContent = it.info.hasIcc ? "ICC: yes" : "ICC: no";
+        badges.appendChild(bICC);
+      }
 
-    // 複数ページ判定（確定）
-    const multi = pdf.numPages > 1;
+      // warnings
+      for(const w of it.warnings){
+        const b = document.createElement("span");
+        b.className = "badge warn";
+        b.textContent = w;
+        badges.appendChild(b);
+      }
 
-    const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: PDF_SCALE });
+      meta.appendChild(fname);
+      meta.appendChild(badges);
 
-    // サムネは軽めに
-    const thumbMax = 320;
-    const tScale = Math.min(thumbMax / viewport.width, thumbMax / viewport.height);
-    const tVp = page.getViewport({ scale: PDF_SCALE * tScale });
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(tVp.width);
-    canvas.height = Math.round(tVp.height);
-    const ctx = canvas.getContext("2d", { alpha: false });
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    await page.render({ canvasContext: ctx, viewport: tVp }).promise;
-
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-    return { thumbUrl: dataUrl, multiPageFlag: multi };
-  }
-
-  // JPEG/PNGの色空間推定（できるだけ、できないならunknown）
-  async function inspectColorSpace(file) {
-    const nameLower = file.name.toLowerCase();
-    const isJpeg = file.type === "image/jpeg" || /\.(jpg|jpeg)$/i.test(nameLower);
-    const isPng = file.type === "image/png" || /\.png$/i.test(nameLower);
-    if (!isJpeg && !isPng) {
-      return { kind: "unknown", label: "色空間不明" };
-    }
-    const buf = await file.arrayBuffer();
-    const u8 = new Uint8Array(buf);
-
-    if (isPng) {
-      // PNG: sRGBチャンク or iCCPがあればRGB確定とする
-      const has_srgb = findPngChunk(u8, "sRGB");
-      const iccp = findPngChunk(u8, "iCCP");
-      if (has_srgb || iccp) return { kind: "rgb", label: "RGB確定" };
-      return { kind: "unknown", label: "色空間不明" };
+      card.appendChild(seq);
+      card.appendChild(exclude);
+      card.appendChild(thumb);
+      card.appendChild(meta);
+      return card;
     }
 
-    // JPEG: ICCのdataColorSpaceを見られれば確定
-    const iccColor = readJpegICCColorSpace(u8); // 'RGB ' / 'CMYK' / null
-    if (iccColor === "RGB ") return { kind: "rgb", label: "RGB確定" };
-    if (iccColor === "CMYK") return { kind: "cmyk", label: "CMYK確定" };
-
-    // APP14 AdobeでYCCK/CMYKっぽいか推定
-    const adobe = readJpegAdobeApp14(u8); // { transform, found } or null
-    const comps = readJpegSOFComponents(u8); // number of components or null
-    if (adobe && comps === 4) {
-      // transform=2 はYCCKの可能性、transform=0 はCMYKの可能性
-      return { kind: "cmyk", label: "CMYK確定" };
+    async function readFileAsU8(file){
+      return new Uint8Array(await file.arrayBuffer());
     }
 
-    // 判断できない
-    return { kind: "unknown", label: "色空間不明" };
-  }
+    async function tryAutoLoadProfiles(){
+      // 同梱運用したい場合：/profiles/ に置く
+      // ※ファイル名は必要に応じて変更OK（ここは「たたき台」）
+      const srgbPath = "profiles/sRGB IEC61966-2.1.icc";
+      const jpPath   = "profiles/JapanColor2001Coated.icc";
 
-  // PNGチャンク探索（簡易）
-  function findPngChunk(u8, typeStr) {
-    // PNG signature
-    if (u8.length < 8) return false;
-    const sig = [137,80,78,71,13,10,26,10];
-    for (let i=0;i<8;i++) if (u8[i] !== sig[i]) return false;
-    let off = 8;
-    while (off + 8 <= u8.length) {
-      const len = readU32BE(u8, off); off += 4;
-      const type = String.fromCharCode(u8[off],u8[off+1],u8[off+2],u8[off+3]); off += 4;
-      if (type === typeStr) return true;
-      off += len + 4; // data + CRC
-      if (off > u8.length) break;
+      async function fetchU8(path){
+        const res = await fetch(path);
+        if(!res.ok) return null;
+        return new Uint8Array(await res.arrayBuffer());
+      }
+
+      const s = await fetchU8(srgbPath);
+      if(s) {
+        srgbProfile = new Magick.ColorProfile(s);
+        log("sRGB ICC auto loaded: " + srgbPath);
+      } else {
+        log("sRGB ICC not found at " + srgbPath + "（手動指定できます）");
+      }
+
+      const j = await fetchU8(jpPath);
+      if(j){
+        japanProfile = new Magick.ColorProfile(j);
+        log("Japan Color ICC auto loaded: " + jpPath);
+      } else {
+        log("Japan Color ICC not found at " + jpPath + "（手動指定できます）");
+      }
     }
-    return false;
-  }
 
-  function readU32BE(u8, off) {
-    return (u8[off]<<24) | (u8[off+1]<<16) | (u8[off+2]<<8) | (u8[off+3]);
-  }
+    async function setProfileFromInput(file, which){
+      const u8 = await readFileAsU8(file);
+      const prof = new Magick.ColorProfile(u8);
+      if(which === "srgb") srgbProfile = prof;
+      if(which === "japan") japanProfile = prof;
+      log(which + " ICC loaded: " + file.name);
+    }
 
-  // JPEG ICC_PROFILE（APP2）からICC headerのdata color spaceを読む
-  function readJpegICCColorSpace(u8) {
-    // ICC header data color space signature: offset 16, length 4
-    // ただしICCは分割されることがあるが、ここでは「最初の塊」だけでも見えることが多い。
-    let off = 0;
-    if (u8.length < 4 || u8[0] !== 0xFF || u8[1] !== 0xD8) return null;
-    off = 2;
-    while (off + 4 < u8.length) {
-      if (u8[off] !== 0xFF) { off++; continue; }
-      const marker = u8[off+1];
-      off += 2;
-      if (marker === 0xD9 || marker === 0xDA) break; // EOI or SOS
-      const segLen = (u8[off]<<8) | u8[off+1];
-      const segStart = off + 2;
-      // APP2 = 0xE2
-      if (marker === 0xE2 && segStart + 14 < u8.length) {
-        const sig = ascii(u8, segStart, 11); // "ICC_PROFILE"
-        if (sig === "ICC_PROFILE") {
-          // header begins after 14 bytes: "ICC_PROFILE\0" + seq + count
-          const iccStart = segStart + 14;
-          if (iccStart + 20 < u8.length) {
-            const cs = ascii(u8, iccStart + 16, 4); // e.g. "RGB "
-            if (cs === "RGB " || cs === "CMYK") return cs;
+    function isPdf(file){
+      return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    }
+
+    async function buildPdfThumbnailAndInfo(file){
+      // 低負荷のサムネ用レンダリング
+      const data = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 0.3 });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      return {
+        canvas,
+        info: { colorSpace: "PDF", hasIcc: false },
+        warnings: ["PDFは1ページ目のみ"]
+      };
+    }
+
+    async function analyzeImageWithMagick(u8){
+      // サムネの警告表示用：colorspace / ICC有無だけ見る
+      return await Magick.ImageMagick.read(u8, (img) => {
+        try{
+          const cs = img.colorSpace;
+          const csName = Object.keys(Magick.ColorSpace).find(k => Magick.ColorSpace[k] === cs) ?? String(cs);
+          const hasIcc = img.hasProfile("icc") || (img.getColorProfile() !== null);
+          return { colorSpace: csName, hasIcc };
+        } finally {
+          img.dispose();
+        }
+      });
+    }
+
+    async function addFiles(files){
+      for(const file of files){
+        const id = crypto.randomUUID();
+        const it = { id, file, kind: isPdf(file) ? "pdf" : "image", excluded:false, warnings:[], info:null };
+
+        if(it.kind === "pdf"){
+          const { canvas, info, warnings } = await buildPdfThumbnailAndInfo(file);
+          it.thumbCanvas = canvas;
+          it.info = info;
+          it.warnings.push(...warnings);
+        } else {
+          it.thumbUrl = URL.createObjectURL(file);
+
+          // magickで解析（CMYK検知など）
+          try{
+            const u8 = await readFileAsU8(file);
+            it.info = await analyzeImageWithMagick(u8);
+
+            // CMYKなら警告（＝JapanColor→sRGB変換が必要）
+            if(it.info.colorSpace === "CMYK" || it.info.colorSpace === "CMY"){
+              it.warnings.push("CMYK入力");
+              if(!japanProfile) it.warnings.push("JapanColor ICC未指定");
+            } else {
+              // RGBでICC無しは警告（sRGB扱いにする）
+              if(!it.info.hasIcc) it.warnings.push("ICCなし→sRGB扱い");
+            }
+          }catch(e){
+            it.warnings.push("解析失敗");
+            log("analyze error: " + file.name + " / " + (e?.message ?? e));
+          }
+        }
+
+        items.push(it);
+        elGrid.appendChild(makeCard(it));
+      }
+
+      refreshSeqBadges();
+    }
+
+    async function rasterizePdfToCanvas(file){
+      const data = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data }).promise;
+      const page = await pdf.getPage(1);
+
+      // 出力650x528に対して十分な解像を確保（2倍目安）
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.max((TARGET_W * 2) / base.width, (TARGET_H * 2) / base.height);
+      const viewport = page.getViewport({ scale });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      return canvas;
+    }
+
+    function containResizeDims(srcW, srcH, dstW, dstH){
+      const scale = Math.min(dstW / srcW, dstH / srcH);
+      return {
+        w: Math.max(1, Math.round(srcW * scale)),
+        h: Math.max(1, Math.round(srcH * scale)),
+      };
+    }
+
+    async function renderToJpegBytesFromMagickImage(img, kind){
+      // kind: "image" | "pdf"
+      // 向き補正
+      try { img.autoOrient(); } catch {}
+
+      // 透明は白で潰す
+      img.backgroundColor = Magick.MagickColors.White;
+      try { img.alpha(Magick.AlphaAction.Remove); } catch {}
+
+      // ---- 色管理（希望ルール）----
+      // sRGBプロファイルがないと「指定プロファイルとしての出力」ができないので警告
+      const warnings = [];
+
+      if(!srgbProfile){
+        warnings.push("sRGB ICC未指定（出力はsRGB相当の可能性）");
+      }
+
+      if(kind === "pdf"){
+        // PDFは既にラスタ化済み（ブラウザ側色処理の影響を受ける可能性がある）
+        if(srgbProfile) img.setProfile(srgbProfile);
+      } else {
+        const cs = img.colorSpace;
+
+        if(cs === Magick.ColorSpace.CMYK || cs === Magick.ColorSpace.CMY){
+          if(japanProfile && srgbProfile){
+            const ok = img.transformColorSpace(japanProfile, srgbProfile, Magick.ColorTransformMode.HighRes);
+            if(!ok) warnings.push("CMYK→sRGB変換失敗");
+            img.setProfile(srgbProfile);
+          } else {
+            warnings.push("CMYKだがICC不足（JapanColor/sRGB）");
+            // 最低限：可能ならsRGBプロファイルだけ付ける（ただし厳密ではない）
+            if(srgbProfile) img.setProfile(srgbProfile);
+          }
+        } else {
+          // RGB系
+          if(srgbProfile){
+            const src = img.getColorProfile(); // embedded ICC
+            if(src){
+              const ok = img.transformColorSpace(src, srgbProfile, Magick.ColorTransformMode.HighRes);
+              if(!ok) warnings.push("ICC→sRGB変換失敗");
+              img.setProfile(srgbProfile);
+            } else {
+              // ICC無しは「sRGBとして扱う」運用（警告はタイル側で既に出している）
+              img.setProfile(srgbProfile);
+            }
           }
         }
       }
-      off += segLen;
-    }
-    return null;
-  }
 
-  // JPEG Adobe APP14
-  function readJpegAdobeApp14(u8) {
-    let off = 2;
-    while (off + 4 < u8.length) {
-      if (u8[off] !== 0xFF) { off++; continue; }
-      const marker = u8[off+1];
-      off += 2;
-      if (marker === 0xD9 || marker === 0xDA) break;
-      const segLen = (u8[off]<<8) | u8[off+1];
-      const segStart = off + 2;
-      if (marker === 0xEE && segStart + 12 < u8.length) { // APP14
-        const sig = ascii(u8, segStart, 5); // "Adobe"
-        if (sig === "Adobe") {
-          const transform = u8[segStart + 11]; // last byte
-          return { found: true, transform };
+      // ---- サイズ合わせ（トリミング無し / 白余白）----
+      const dims = containResizeDims(img.width, img.height, TARGET_W, TARGET_H);
+      img.resize(dims.w, dims.h);
+
+      // 中央配置で 650x528 に extent
+      img.extent(TARGET_W, TARGET_H, Magick.Gravity.Center, Magick.MagickColors.White);
+
+      // ---- 出力設定 ----
+      img.density = new Magick.Density(OUT_DPI, OUT_DPI, Magick.DensityUnit.PixelsPerInch);
+      img.quality = OUT_QUALITY;
+
+      // JPEGで書き出し
+      const outU8 = await img.write(Magick.MagickFormat.Jpeg, (data) => data);
+      return { outU8, warnings };
+    }
+
+    async function processOneToJpegU8(it){
+      if(it.kind === "pdf"){
+        const canvas = await rasterizePdfToCanvas(it.file);
+        return await Magick.ImageMagick.readFromCanvas(canvas, async (img) => {
+          try{
+            return await renderToJpegBytesFromMagickImage(img, "pdf");
+          } finally {
+            img.dispose();
+          }
+        }, { alpha: false });
+      } else {
+        const u8 = await readFileAsU8(it.file);
+        return await Magick.ImageMagick.read(u8, async (img) => {
+          try{
+            return await renderToJpegBytesFromMagickImage(img, "image");
+          } finally {
+            img.dispose();
+          }
+        });
+      }
+    }
+
+    async function exportZip(){
+      const prefix = (elPrefix.value || "").trim();
+      if(!prefix){
+        alert("固定名（prefix）を入力してください");
+        return;
+      }
+      if(!magickReady){
+        alert("ImageMagickの初期化が完了していません");
+        return;
+      }
+
+      const digits = currentDigits();
+      const zip = new JSZip();
+
+      setStatus("書き出し中…");
+      log("export start. items=" + items.length);
+
+      for(let i=0;i<items.length;i++){
+        const it = items[i];
+        const seq = i + 1;
+
+        if(it.excluded){
+          log("skip (excluded): " + it.file.name + " => " + pad(seq, digits));
+          continue; // 連番は詰めない（運用ルール）
+        }
+
+        try{
+          const { outU8, warnings } = await processOneToJpegU8(it);
+          const outName = `${prefix}${pad(seq, digits)}.jpg`;
+          zip.file(outName, outU8);
+
+          if(warnings.length){
+            log("warn: " + outName + " / " + warnings.join(", "));
+          } else {
+            log("ok: " + outName);
+          }
+        }catch(e){
+          log("ERROR: " + it.file.name + " / " + (e?.message ?? e));
         }
       }
-      off += segLen;
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${prefix}.zip`;
+      a.click();
+
+      setStatus("完了");
+      log("export done: " + a.download);
     }
-    return null;
-  }
 
-  // JPEG SOFからコンポーネント数を読む（3 or 4 の判定用）
-  function readJpegSOFComponents(u8) {
-    let off = 2;
-    while (off + 4 < u8.length) {
-      if (u8[off] !== 0xFF) { off++; continue; }
-      const marker = u8[off+1];
-      off += 2;
-      if (marker === 0xD9 || marker === 0xDA) break;
-      const segLen = (u8[off]<<8) | u8[off+1];
-      const segStart = off + 2;
-
-      // SOF0..SOF3, SOF5..SOF7, SOF9..SOF11, SOF13..SOF15
-      const isSOF =
-        (marker >= 0xC0 && marker <= 0xC3) ||
-        (marker >= 0xC5 && marker <= 0xC7) ||
-        (marker >= 0xC9 && marker <= 0xCB) ||
-        (marker >= 0xCD && marker <= 0xCF);
-
-      if (isSOF && segStart + 9 < u8.length) {
-        const comps = u8[segStart + 8];
-        return comps;
+    function clearAll(){
+      // revoke object urls
+      for(const it of items){
+        if(it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
       }
-      off += segLen;
+      items.length = 0;
+      elGrid.innerHTML = "";
+      refreshSeqBadges();
+      setStatus(magickReady ? "待機中" : "初期化中…");
+      log("cleared");
     }
-    return null;
-  }
 
-  function ascii(u8, start, len) {
-    let s = "";
-    for (let i=0; i<len; i++) s += String.fromCharCode(u8[start+i] || 0);
-    return s;
-  }
-
-  // 変換（単一タイル）
-  async function convertTileToJpegBlob(tile, outName) {
-    if (tile.kind === "pdf") {
-      return await convertPdfFirstPage(tile.file);
-    }
-    return await convertImageFile(tile.file);
-  }
-
-  async function convertImageFile(file) {
-    const bmp = await createImageBitmap(file);
-    const outCanvas = document.createElement("canvas");
-    outCanvas.width = TARGET_W;
-    outCanvas.height = TARGET_H;
-    const ctx = outCanvas.getContext("2d", { alpha: false });
-
-    // 白背景
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0,0,TARGET_W,TARGET_H);
-
-    // contain（トリミングなし）＋小さい場合は拡大OK
-    const scale = Math.min(TARGET_W / bmp.width, TARGET_H / bmp.height);
-    const w = Math.round(bmp.width * scale);
-    const h = Math.round(bmp.height * scale);
-    const x = Math.floor((TARGET_W - w) / 2);
-    const y = Math.floor((TARGET_H - h) / 2);
-
-    ctx.drawImage(bmp, x, y, w, h);
-    bmp.close();
-
-    return await canvasToJpegBlob(outCanvas);
-  }
-
-  async function convertPdfFirstPage(file) {
-    const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-    const page = await pdf.getPage(1);
-
-    // 144dpi相当でレンダリング
-    const viewport = page.getViewport({ scale: PDF_SCALE });
-    const renderCanvas = document.createElement("canvas");
-    renderCanvas.width = Math.round(viewport.width);
-    renderCanvas.height = Math.round(viewport.height);
-    const rctx = renderCanvas.getContext("2d", { alpha: false });
-    rctx.fillStyle = "#fff";
-    rctx.fillRect(0,0,renderCanvas.width, renderCanvas.height);
-
-    await page.render({ canvasContext: rctx, viewport }).promise;
-
-    // その結果を650x528にフィット
-    const outCanvas = document.createElement("canvas");
-    outCanvas.width = TARGET_W;
-    outCanvas.height = TARGET_H;
-    const ctx = outCanvas.getContext("2d", { alpha: false });
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0,0,TARGET_W,TARGET_H);
-
-    const scale = Math.min(TARGET_W / renderCanvas.width, TARGET_H / renderCanvas.height);
-    const w = Math.round(renderCanvas.width * scale);
-    const h = Math.round(renderCanvas.height * scale);
-    const x = Math.floor((TARGET_W - w) / 2);
-    const y = Math.floor((TARGET_H - h) / 2);
-    ctx.drawImage(renderCanvas, x, y, w, h);
-
-    return await canvasToJpegBlob(outCanvas);
-  }
-
-  function canvasToJpegBlob(canvas) {
-    return new Promise((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) return reject(new Error("toBlob failed"));
-        resolve(blob);
-      }, "image/jpeg", JPEG_QUALITY);
+    // ---- D&D ----
+    elDrop.addEventListener("dragover", (e)=>{ e.preventDefault(); elDrop.style.borderColor="#6aa9ff"; });
+    elDrop.addEventListener("dragleave", ()=>{ elDrop.style.borderColor=""; });
+    elDrop.addEventListener("drop", async (e)=>{
+      e.preventDefault();
+      elDrop.style.borderColor="";
+      const files = [...(e.dataTransfer?.files ?? [])];
+      if(!files.length) return;
+      await addFiles(files);
+      updateItemOrderFromDOM();
     });
-  }
 
-  // ZIP出力
-  btnZip.addEventListener("click", async () => {
-    const prefix = (elPrefix.value || "260120pickup").trim();
-    if (!prefix) { alert("固定名が空です"); return; }
-
-    const zip = new JSZip();
-
-    const nodes = [...elGrid.querySelectorAll(".tile")];
-    // DOM順＝現在の並び順
-    const order = nodes.map(n => n.dataset.id);
-    const orderedTiles = order.map(id => tiles.find(t => t.id === id)).filter(Boolean);
-
-    const total = orderedTiles.length;
-    const targets = orderedTiles.filter(t => !t.excluded && t.status !== "error");
-    if (!targets.length) return;
-
-    setProgress(0);
-    btnZip.disabled = true;
-
-    try {
-      // 欠番あり（除外/ERRORはスキップ）だが、番号は並び順の位置(i)で決まる
-      for (let i = 0; i < orderedTiles.length; i++) {
-        const t = orderedTiles[i];
-        const out = `${prefix}${pad(i+1, (total>=100?3:2))}.jpg`;
-
-        if (t.excluded || t.status === "error") continue;
-
-        const blob = await convertTileToJpegBlob(t, out);
-        zip.file(out, blob);
-
-        setProgress(((i+1)/orderedTiles.length)*100);
-        await microYield();
+    // ---- sortable ----
+    new Sortable(elGrid, {
+      animation: 150,
+      onEnd: () => {
+        updateItemOrderFromDOM();
+        log("reordered");
       }
-
-      const zipBlob = await zip.generateAsync({ type: "blob" }, (meta) => {
-        // zip生成中もバー更新（上書き）
-        setProgress(Math.max(elBar.style.width.replace("%","")|0, meta.percent));
-      });
-
-      downloadBlob(zipBlob, zipName());
-    } catch (e) {
-      console.error(e);
-      alert("ZIP生成中にエラーが発生しました。コンソールも確認してください。");
-    } finally {
-      setProgress(0);
-      btnZip.disabled = false;
-    }
-  });
-
-  function downloadBlob(blob, filename) {
-    const a = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  function microYield() {
-    return new Promise(r => setTimeout(r, 0));
-  }
-
-  // ボタン類
-  btnClear.addEventListener("click", () => {
-    // URL解放
-    tiles.forEach(t => {
-      if (t.srcObjectUrl) URL.revokeObjectURL(t.srcObjectUrl);
     });
-    tiles = [];
-    elGrid.innerHTML = "";
-    updateAll();
-  });
 
-  btnWarnExclude.addEventListener("click", () => {
-    tiles.forEach(t => {
-      if (t.status === "warn") t.excluded = true;
-      if (t.status === "error") t.excluded = true;
+    // ---- buttons ----
+    elBtnExport.addEventListener("click", exportZip);
+    elBtnClear.addEventListener("click", clearAll);
+
+    // ---- icc inputs ----
+    elSrgbIcc.addEventListener("change", async ()=>{
+      const f = elSrgbIcc.files?.[0];
+      if(!f) return;
+      await setProfileFromInput(f, "srgb");
+      // 既存タイルの警告を更新したい場合は、運用に合わせて再解析を追加してOK
     });
-    updateAll();
-  });
-
-  btnAllClearExclude.addEventListener("click", () => {
-    tiles.forEach(t => {
-      // ERRORは外しても変換できないので、見た目のためにOFFは許すが、ZIP時にスキップされる
-      t.excluded = false;
+    elJapanIcc.addEventListener("change", async ()=>{
+      const f = elJapanIcc.files?.[0];
+      if(!f) return;
+      await setProfileFromInput(f, "japan");
     });
-    updateAll();
-  });
 
-  elPrefix.addEventListener("input", () => updateAll());
+    // ---- init ----
+    (async ()=>{
+      setStatus("ImageMagick 初期化中…");
+      log("init magick-wasm...");
 
-  // 初期
-  updateAll();
-})();
-</script>
+      // magick.wasm のURLを指定して初期化
+      await Magick.initializeImageMagick(new URL("https://cdn.jsdelivr.net/npm/@imagemagick/magick-wasm@0.0.37/dist/magick.wasm"));
+
+      magickReady = true;
+      setStatus("待機中（D&Dしてください）");
+      log("magick-wasm ready.");
+
+      await tryAutoLoadProfiles();
+
+      refreshSeqBadges();
+    })().catch(err=>{
+      setStatus("初期化失敗");
+      log("FATAL init error: " + (err?.message ?? err));
+      console.error(err);
+    });
+  </script>
 </body>
 </html>
