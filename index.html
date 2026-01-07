@@ -415,6 +415,31 @@
       };
     }
 
+    async function magickWriteCopyU8(img, format){
+      let out = null;
+
+      // writeの戻りがPromiseの場合もあるので吸収
+      const maybePromise = img.write(format, (data) => {
+        // ★重要：ここで必ずコピーする（参照を保持しない）
+        out = new Uint8Array(data);
+      });
+
+      if (maybePromise && typeof maybePromise.then === "function") {
+        await maybePromise;
+      }
+
+      if (!out || out.length < 4) {
+        throw new Error("JPEG書き出しに失敗しました（出力データが空）");
+      }
+
+      // 念のためJPEGシグネチャ確認（SOI: FF D8）
+      if (!(out[0] === 0xFF && out[1] === 0xD8)) {
+        throw new Error("JPEG書き出しが壊れています（SOIがありません）");
+      }
+
+      return out;
+    }
+
     async function renderToJpegBytesFromMagickImage(img, kind){
       // kind: "image" | "pdf"
       // 向き補正
@@ -476,7 +501,7 @@
       img.quality = OUT_QUALITY;
 
       // JPEGで書き出し
-      const outU8 = await img.write(Magick.MagickFormat.Jpeg, (data) => data);
+      const outU8 = await magickWriteCopyU8(img, Magick.MagickFormat.Jpeg);
       return { outU8, warnings };
     }
 
@@ -531,7 +556,7 @@
         try{
           const { outU8, warnings } = await processOneToJpegU8(it);
           const outName = `${prefix}${pad(seq, digits)}.jpg`;
-          zip.file(outName, outU8);
+          zip.file(outName, outU8, { binary: true });
 
           if(warnings.length){
             log("warn: " + outName + " / " + warnings.join(", "));
