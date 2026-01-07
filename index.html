@@ -1,0 +1,1038 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>商品画像リサイズ（650x528 / ICC / ZIP）</title>
+  <style>
+        :root{
+      /* Unity-like dark theme */
+      --bg:#2b2b2b;
+      --panel:#3a3a3a;
+      --line:#1f1f1f;
+      --text:#d4d4d4;
+      --muted:#a6a6a6;
+      --warn:#f2c14e;
+      --err:#f26d6d;
+      --ok:#8bdc65;
+      --tile: 180px;
+      --radius: 4px;
+      --control:#3f3f3f;
+      --control2:#2f2f2f;
+      --hover:#4a4a4a;
+      --active:#353535;
+      --focus:#5c9ded;
+    }
+*{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{padding:36px 14px 12px;border-bottom:1px solid var(--line);background:#262626;display:flex;flex-direction:column;gap:10px;align-items:stretch}
+    header h1{font-size:13px;margin:0;color:var(--text)}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    label{font-size:12px;color:var(--muted)}
+    input[type="text"]{height:26px;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control2);color:var(--text)}
+    input[type="file"]{font-size:12px;color:var(--muted)}
+    button{height:26px;padding:0 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control);color:var(--text);cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+
+    header h1{font-size:13px;margin:0;color:var(--text)}
+    input[type="file"]{width:520px;max-width:100%}
+    .outname{font-size:12px;color:var(--muted);line-height:1.2;word-break:break-all}
+    .trash{width:34px;height:34px;min-width:34px;min-height:34px;flex:0 0 34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:var(--radius);background:#2d2d2d;color:var(--muted);user-select:none;overflow:hidden;contain:layout paint;}
+.trash{transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, transform .12s ease;}
+    .trash.hi{background:#3a2222;border-color:#7a2a2a;box-shadow:0 0 0 1px rgba(242,109,109,.12) inset;color:var(--err)}
+
+    .container{padding:14px;display:grid;gap:12px}
+    .drop{border:1px dashed #5a5a5a;border-radius:var(--radius);padding:14px;background:#303030;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.drop strong{font-size:13px}
+    .drop span{font-size:12px;color:var(--muted)}
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr));
+      gap:12px
+    }
+    .card{
+      border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
+      overflow:hidden;position:relative
+    }
+    .thumb{width:100%;height:140px;background:#2d2d2d;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line)}
+    .thumb img, .thumb canvas{max-width:100%;max-height:100%;display:block}
+    .meta{padding:10px;display:grid;gap:6px}
+    .fname{font-size:12px;line-height:1.2;word-break:break-all}
+    .badges{display:flex;gap:6px;flex-wrap:wrap}
+    .badge{font-size:11px;border:1px solid var(--line);border-radius:3px;padding:2px 6px;color:var(--muted);background:#2d2d2d}
+    .badge.warn{border-color:rgba(255,204,102,.5);color:var(--warn)}
+    .badge.err{border-color:rgba(255,107,107,.5);color:var(--err)}
+    .badge.ok{border-color:rgba(107,255,149,.5);color:var(--ok)}
+    .seq{position:absolute;left:10px;top:10px;background:#2d2d2d;border:1px solid var(--line);border-radius:var(--radius);padding:3px 6px;font-size:12px;color:var(--text)}
+    .exclude{position:absolute;right:10px;top:10px;display:flex;align-items:center;gap:6px;background:#2d2d2d;border:1px solid var(--line);border-radius:var(--radius);padding:3px 6px;font-size:12px;color:var(--text)}
+    .exclude input{width:14px;height:14px}
+    .small{font-size:12px;color:var(--muted)}
+    .footer{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .log{border:1px solid var(--line);border-radius:var(--radius);background:#2a2a2a;padding:10px;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--muted)}
+      .ver{position:fixed;left:8px;top:8px;font-size:11px;color:#ff3b3b;z-index:9999;pointer-events:none;}
+  
+    /* confirm modal */
+    .modal{
+      position:fixed;inset:0;z-index:10000;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.55);
+    }
+    .modal.hidden{display:none}
+    .modalCard{
+      width:min(420px, calc(100vw - 28px));
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:var(--panel);
+      box-shadow:0 10px 24px rgba(0,0,0,.35);
+      padding:14px;
+    }
+    .modalTitle{font-size:13px;margin:0 0 8px 0}
+    .modalMsg{font-size:12px;color:var(--muted);line-height:1.5;white-space:pre-wrap;margin:0 0 12px 0}
+    .modalActions{display:flex;gap:10px;justify-content:flex-end}
+    .btnDanger{border-color:rgba(255,107,107,.55);box-shadow:0 0 0 1px rgba(255,107,107,.12) inset}
+
+  
+    button:hover{background:var(--hover)}
+    button:active{background:var(--active)}
+    input[type="text"]:focus{outline:1px solid var(--focus);outline-offset:0}
+
+    button:focus-visible{outline:1px solid var(--focus);outline-offset:1px}
+</style>
+</head>
+<body>
+  <div class="ver">Ver_1.1.1</div>
+
+  <div id="confirmOverlay" class="modal hidden" aria-hidden="true">
+    <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMsg">
+      <div class="modalTitle" id="confirmTitle">確認</div>
+      <div class="modalMsg" id="confirmMsg"></div>
+      <div class="modalActions">
+        <button id="confirmCancel" type="button">戻る</button>
+        <button id="confirmOk" type="button" class="btnDanger">OK</button>
+      </div>
+    </div>
+  </div>
+  <header>
+    <h1>商品画像リサイズ（650×528 / JPEG Q100 / 144dpi / ICC→sRGB / ZIP）</h1>
+
+    <div class="row">
+      <label>固定名（ZIP名にも使用）</label>
+      <input id="prefix" type="text" value="260000pickup" />
+    </div>
+
+    <div class="row">
+      <label>sRGB IEC61966-2.1</label>
+      <input id="srgbIcc" type="file" accept=".icc,.icm,application/octet-stream" />
+      <label>Japan Color 2001 Coated ICC</label>
+      <input id="japanIcc" type="file" accept=".icc,.icm,application/octet-stream" />
+    </div>
+
+    <div class="row">
+      <button id="btnDummy" type="button">ダミー追加</button>
+      <button id="btnExport" disabled>ZIPを書き出し</button>
+      <button id="btnClear">クリア</button>
+      <div id="trash" class="trash" title="ここにドラッグで削除">🗑</div>
+      <span id="status" class="small">初期化中…</span>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="drop" class="drop">
+      <div>
+        <strong>ここに画像 / PDF をドラッグ＆ドロップ</strong><br />
+        <span>投入後にタイル表示 → 並び替え → 除外チェック → ZIP出力</span>
+      </div>
+      <div class="footer">
+        <span class="small">出力: 650×528 / 白余白 / Q100 / 144dpi / sRGB</span>
+      </div>
+    </div>
+
+    <div id="grid" class="grid"></div>
+
+    <div id="log" class="log">Log:</div>
+  </div>
+
+  <!-- SortableJS -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
+  <!-- JSZip -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <!-- pdf.js (ESM) + magick-wasm (ESM) -->
+  <script type="module">
+    import * as Magick from "https://cdn.jsdelivr.net/npm/@imagemagick/magick-wasm@0.0.37/dist/index.js";
+    import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs";
+
+    // ---- constants ----
+    const TARGET_W = 650;
+    const TARGET_H = 528;
+    const OUT_DPI = 144;
+    const OUT_QUALITY = 100;
+
+    // pdf.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs";
+
+    // ---- state ----
+    /** @type {{id:string, file:File, kind:"image"|"pdf"|"dummy", excluded:boolean, warnings:string[], info:{colorSpace?:string, hasIcc?:boolean}|null, thumbUrl?:string, thumbCanvas?:HTMLCanvasElement}[]} */
+    const items = [];
+
+    // ---- warn on refresh / tab close when there are items ----
+    window.addEventListener("beforeunload", (e) => {
+      // Show standard browser warning only when there is something in the list.
+      if (items.length === 0) return;
+      e.preventDefault();
+      // Most browsers ignore the custom message and show a standard prompt.
+      e.returnValue = "";
+    });
+
+    let srgbProfile = null;       // Magick.ColorProfile
+    let japanProfile = null;      // Magick.ColorProfile
+    let magickReady = false;
+
+    // ---- dom ----
+    const elGrid = document.getElementById("grid");
+    const elDrop = document.getElementById("drop");
+    const elPrefix = document.getElementById("prefix");
+    const elBtnExport = document.getElementById("btnExport");
+    const elBtnClear = document.getElementById("btnClear");
+    const elBtnDummy = document.getElementById("btnDummy");
+    const elStatus = document.getElementById("status");
+    const elLog = document.getElementById("log");
+    // ---- confirm modal ----
+    const elConfirmOverlay = document.getElementById("confirmOverlay");
+    const elConfirmTitle = document.getElementById("confirmTitle");
+    const elConfirmMsg = document.getElementById("confirmMsg");
+    const elConfirmOk = document.getElementById("confirmOk");
+    const elConfirmCancel = document.getElementById("confirmCancel");
+
+    function showConfirm({ title="確認", message="", okText="OK", cancelText="戻る", okDanger=false } = {}){
+      return new Promise((resolve)=>{
+        let done = false;
+        const finish = (v)=>{
+          if(done) return;
+          done = true;
+          elConfirmOverlay.classList.add("hidden");
+          elConfirmOverlay.setAttribute("aria-hidden","true");
+          cleanup();
+          resolve(v);
+        };
+        const onKey = (e)=>{
+          if(e.key === "Escape") finish(false);
+          if(e.key === "Enter") finish(true);
+        };
+        const onBackdrop = (e)=>{
+          if(e.target === elConfirmOverlay) finish(false);
+        };
+        const cleanup = ()=>{
+          elConfirmOk.removeEventListener("click", onOk);
+          elConfirmCancel.removeEventListener("click", onCancel);
+          document.removeEventListener("keydown", onKey);
+          elConfirmOverlay.removeEventListener("mousedown", onBackdrop);
+        };
+        const onOk = ()=>finish(true);
+        const onCancel = ()=>finish(false);
+
+        elConfirmTitle.textContent = title;
+        elConfirmMsg.textContent = message;
+        elConfirmOk.textContent = okText;
+        elConfirmCancel.textContent = cancelText;
+
+        elConfirmOk.classList.toggle("btnDanger", !!okDanger);
+
+        elConfirmOverlay.classList.remove("hidden");
+        elConfirmOverlay.setAttribute("aria-hidden","false");
+        elConfirmOk.focus();
+
+        elConfirmOk.addEventListener("click", onOk);
+        elConfirmCancel.addEventListener("click", onCancel);
+        document.addEventListener("keydown", onKey);
+        elConfirmOverlay.addEventListener("mousedown", onBackdrop);
+      });
+    }
+
+    const elSrgbIcc = document.getElementById("srgbIcc");
+    const elJapanIcc = document.getElementById("japanIcc");
+
+    function log(msg){
+      elLog.textContent += "\\n" + msg;
+      elLog.scrollTop = elLog.scrollHeight;
+    }
+
+    function setStatus(msg){ elStatus.textContent = msg; }
+
+    function pad(num, width){
+      const s = String(num);
+      return s.length >= width ? s : "0".repeat(width - s.length) + s;
+    }
+
+
+    // ★重要：Magickのwriteが返すdataは寿命が短いので、必ずコピーして保持する
+    async function magickWriteCopyU8(img, format){
+      let out = null;
+      const maybePromise = img.write(format, (data) => {
+        out = new Uint8Array(data); // ここでコピー
+      });
+      if(maybePromise && typeof maybePromise.then === "function"){
+        await maybePromise;
+      }
+      if(!out || out.length < 4){
+        throw new Error("JPEG書き出しに失敗しました（出力が空）");
+      }
+      // JPEG SOI (FF D8)
+      if(!(out[0] === 0xFF && out[1] === 0xD8)){
+        throw new Error("JPEG書き出しが壊れています（SOIがありません）");
+      }
+      return out;
+    }
+
+    function currentDigits(){
+      // 「入力総数」が100超えたら3桁（除外しても詰めない運用なので、総数基準にする）
+      return items.length >= 100 ? 3 : 2;
+    }
+
+    function refreshSeqBadges(){
+      const cards = [...elGrid.querySelectorAll(".card")];
+      const digits = currentDigits();
+      const prefix = (elPrefix.value || "").trim() || "output";
+      cards.forEach((card, idx)=>{
+        const seq = idx + 1;
+        const seqStr = pad(seq, digits);
+        const seqEl = card.querySelector(".seq");
+        if(seqEl) seqEl.textContent = seqStr;
+
+        const outEl = card.querySelector(".outname");
+        if(outEl) outEl.textContent = `${prefix}${seqStr}.jpg`;
+      });
+      // exportボタン
+      elBtnExport.disabled = !magickReady || items.length === 0;
+    }
+
+    function updateItemOrderFromDOM(){
+      const cards = [...elGrid.querySelectorAll(".card")];
+      const newOrder = [];
+      for(const card of cards){
+        const id = card.dataset.id;
+        const it = items.find(x=>x.id===id);
+        if(it) newOrder.push(it);
+      }
+      items.length = 0;
+      items.push(...newOrder);
+      refreshSeqBadges();
+    }
+
+    function makeCard(it){
+      const card = document.createElement("div");
+      card.className = "card";
+      card.dataset.id = it.id;
+
+      const seq = document.createElement("div");
+      seq.className = "seq";
+      seq.textContent = "??";
+
+      const exclude = document.createElement("label");
+      exclude.className = "exclude";
+      exclude.innerHTML = '<input type="checkbox" />除外';
+      const chk = exclude.querySelector("input");
+      chk.checked = it.excluded;
+      chk.addEventListener("change", ()=>{
+        it.excluded = chk.checked;
+        refreshSeqBadges(); // 連番は詰めないが、UI更新は必要
+      });
+
+      const thumb = document.createElement("div");
+      thumb.className = "thumb";
+      if(it.thumbCanvas){
+        thumb.appendChild(it.thumbCanvas);
+      }else{
+        const img = document.createElement("img");
+        img.alt = it.file.name;
+        img.src = it.thumbUrl || "";
+        thumb.appendChild(img);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+
+      const fname = document.createElement("div");
+      fname.className = "fname";
+      fname.textContent = it.file.name;
+
+      
+
+      const outname = document.createElement("div");
+      outname.className = "outname";
+      outname.textContent = "";const badges = document.createElement("div");
+      badges.className = "badges";
+
+      // kind badge
+      const bKind = document.createElement("span");
+      bKind.className = "badge";
+      bKind.textContent = it.kind.toUpperCase();
+      badges.appendChild(bKind);
+
+      // info badges
+      if(it.info){
+        const bCS = document.createElement("span");
+        bCS.className = "badge";
+        bCS.textContent = it.info.colorSpace ?? "Color: ?";
+        badges.appendChild(bCS);
+
+        const bICC = document.createElement("span");
+        bICC.className = "badge";
+        bICC.textContent = it.info.hasIcc ? "ICC: yes" : "ICC: no";
+        badges.appendChild(bICC);
+      }
+
+      // warnings
+      for(const w of it.warnings){
+        const b = document.createElement("span");
+        b.className = "badge warn";
+        b.textContent = w;
+        badges.appendChild(b);
+      }
+
+      meta.appendChild(fname);
+      meta.appendChild(outname);
+      meta.appendChild(badges);
+
+      card.appendChild(seq);
+      card.appendChild(exclude);
+      card.appendChild(thumb);
+      card.appendChild(meta);
+      return card;
+    }
+
+    async function readFileAsU8(file){
+      return new Uint8Array(await file.arrayBuffer());
+    }
+
+    async function tryAutoLoadProfiles(){
+      // 同梱運用したい場合：/profiles/ に置く
+      // ※ファイル名は必要に応じて変更OK（ここは「たたき台」）
+      const srgbPath = "profiles/sRGB IEC61966-2.1.icc";
+      const jpPath   = "profiles/JapanColor2001Coated.icc";
+
+      async function fetchU8(path){
+        const res = await fetch(path);
+        if(!res.ok) return null;
+        return new Uint8Array(await res.arrayBuffer());
+      }
+
+      const s = await fetchU8(srgbPath);
+      if(s) {
+        srgbProfile = new Magick.ColorProfile(s);
+        log("sRGB ICC auto loaded: " + srgbPath);
+      } else {
+        log("sRGB ICC not found at " + srgbPath + "（手動指定できます）");
+      }
+
+      const j = await fetchU8(jpPath);
+      if(j){
+        japanProfile = new Magick.ColorProfile(j);
+        log("Japan Color ICC auto loaded: " + jpPath);
+      } else {
+        log("Japan Color ICC not found at " + jpPath + "（手動指定できます）");
+      }
+    }
+
+    async function setProfileFromInput(file, which){
+      const u8 = await readFileAsU8(file);
+      const prof = new Magick.ColorProfile(u8);
+      if(which === "srgb") srgbProfile = prof;
+      if(which === "japan") japanProfile = prof;
+      log(which + " ICC loaded: " + file.name);
+    }
+
+    function isPdf(file){
+      return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    }
+
+    function isTiff(file){
+      return file.type === "image/tiff" || /\.tiff?$/i.test(file.name);
+    }
+
+    function makePlaceholderCanvas(label){
+      const c = document.createElement("canvas");
+      c.width = 320;
+      c.height = 180;
+      c.dataset.placeholder = "1";
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#0f1620";
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.strokeStyle = "#22303e";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, c.width - 2, c.height - 2);
+      ctx.fillStyle = "#93a4b5";
+      ctx.font = "bold 28px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, c.width / 2, c.height / 2);
+      return c;
+    }
+
+    function makeSolidCanvas(w, h, color, labelText){
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, w, h);
+
+      // optional label (subtle)
+      if(labelText){
+        ctx.fillStyle = "rgba(0,0,0,.35)";
+        ctx.font = "bold 28px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(labelText, w/2, h/2);
+      }
+      return c;
+    }
+
+    function makeDummyThumbCanvas(){
+      // サムネはタイル枠に収まる程度でOK
+      return makeSolidCanvas(320, 180, "#b0b8bb", "DUMMY");
+    }
+
+    function makeDummyExportCanvas(){
+      // 出力用ダミー（#b0b8bb / 650x528）
+      return makeSolidCanvas(TARGET_W, TARGET_H, "#b0b8bb", null);
+    }
+
+    async function buildTiffThumbnailUrl(file){
+      // TIFFはブラウザの<img>で直接表示できないことが多いので、magick-wasmでサムネを作る
+      const u8 = await readFileAsU8(file);
+      return await Magick.ImageMagick.read(u8, async (img) => {
+        try{
+          try{ img.autoOrient(); } catch {}
+          img.backgroundColor = Magick.MagickColors.White;
+          try{ img.alpha(Magick.AlphaAction.Remove); } catch {}
+
+          // サムネは軽量優先（見た目確認用）
+          const MAX_W = 320;
+          const MAX_H = 240;
+          const dims = containResizeDims(img.width, img.height, MAX_W, MAX_H);
+          img.resize(dims.w, dims.h);
+
+          img.quality = 85;
+          const thumbU8 = await magickWriteCopyU8(img, Magick.MagickFormat.Jpeg);
+          const blob = new Blob([thumbU8], { type: "image/jpeg" });
+          return URL.createObjectURL(blob);
+        } finally {
+          img.dispose();
+        }
+      });
+    }
+
+    async function refreshTiffThumbnails(){
+      // 初期化前に投入されたTIFFを、初期化後にサムネ生成して差し替える
+      const tasks = [];
+      for(const it of items){
+        if(it.kind !== "image") continue;
+        if(!isTiff(it.file)) continue;
+        if(it.thumbUrl && !it.thumbCanvas) continue;
+
+        tasks.push((async () => {
+          try{
+            const url = await buildTiffThumbnailUrl(it.file);
+            it.thumbUrl = url;
+            delete it.thumbCanvas;
+            it.warnings = (it.warnings || []).filter(w => w !== "TIFFサムネは初期化後");
+
+            const card = elGrid.querySelector(`.card[data-id="${it.id}"]`);
+            if(card){
+              const thumbDiv = card.querySelector(".thumb");
+              if(thumbDiv){
+                thumbDiv.innerHTML = "";
+                const img = document.createElement("img");
+                img.alt = it.file.name;
+                img.src = it.thumbUrl || "";
+                thumbDiv.appendChild(img);
+              }
+            }
+          } catch (e) {
+            // 失敗時はプレースホルダのまま
+            if(!it.thumbCanvas) it.thumbCanvas = makePlaceholderCanvas("TIFF");
+            if(!(it.warnings || []).includes("TIFFサムネ失敗")) it.warnings.push("TIFFサムネ失敗");
+          }
+        })());
+      }
+      if(tasks.length){
+        await Promise.all(tasks);
+      }
+    }
+
+
+    async function buildPdfThumbnailAndInfo(file){
+      // 低負荷のサムネ用レンダリング
+      const data = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 0.3 });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      return {
+        canvas,
+        info: { colorSpace: "PDF", hasIcc: false },
+        warnings: ["PDFは1ページ目のみ"]
+      };
+    }
+
+    async function analyzeImageWithMagick(u8){
+      // サムネの警告表示用：colorspace / ICC有無だけ見る
+      return await Magick.ImageMagick.read(u8, (img) => {
+        try{
+          const cs = img.colorSpace;
+          const csName = Object.keys(Magick.ColorSpace).find(k => Magick.ColorSpace[k] === cs) ?? String(cs);
+          const hasIcc = img.hasProfile("icc") || (img.getColorProfile() !== null);
+          return { colorSpace: csName, hasIcc };
+        } finally {
+          img.dispose();
+        }
+      });
+    }
+
+
+    function addDummy(){
+      const id = crypto.randomUUID();
+      // Fileを実体として持たせる（名前表示用）。中身は空でOK（dummyは専用処理で書き出す）
+      const file = new File([], "DUMMY", { type: "application/octet-stream" });
+
+      const it = {
+        id,
+        file,
+        kind: "dummy",
+        excluded: false,
+        warnings: [],
+        info: { colorSpace: "DUMMY", hasIcc: false },
+        thumbCanvas: makeDummyThumbCanvas()
+      };
+
+      items.push(it);
+      elGrid.appendChild(makeCard(it));
+      refreshSeqBadges();
+      log("dummy added");
+    }
+
+    async function addFiles(files){
+      for(const file of files){
+        const id = crypto.randomUUID();
+        const it = { id, file, kind: isPdf(file) ? "pdf" : "image", excluded:false, warnings:[], info:null };
+
+        if(it.kind === "pdf"){
+          const { canvas, info, warnings } = await buildPdfThumbnailAndInfo(file);
+          it.thumbCanvas = canvas;
+          it.info = info;
+          it.warnings.push(...warnings);
+        } else {
+          if(isTiff(file)){
+            it.warnings.push("TIFF");
+            if(magickReady){
+              try{
+                it.thumbUrl = await buildTiffThumbnailUrl(file);
+              }catch(e){
+                it.warnings.push("TIFFサムネ失敗");
+                it.thumbCanvas = makePlaceholderCanvas("TIFF");
+              }
+            } else {
+              it.warnings.push("TIFFサムネは初期化後");
+              it.thumbCanvas = makePlaceholderCanvas("TIFF");
+            }
+          } else {
+            it.thumbUrl = URL.createObjectURL(file);
+          }
+
+          // magickで解析（CMYK検知など）
+          try{
+            const u8 = await readFileAsU8(file);
+            it.info = await analyzeImageWithMagick(u8);
+
+            // CMYKなら警告（＝JapanColor→sRGB変換が必要）
+            if(it.info.colorSpace === "CMYK" || it.info.colorSpace === "CMY"){
+              it.warnings.push("CMYK入力");
+              if(!japanProfile) it.warnings.push("JapanColor ICC未指定");
+            } else {
+              // RGBでICC無しは警告（sRGB扱いにする）
+              if(!it.info.hasIcc) it.warnings.push("ICCなし→sRGB扱い");
+            }
+          }catch(e){
+            it.warnings.push("解析失敗");
+            log("analyze error: " + file.name + " / " + (e?.message ?? e));
+          }
+        }
+
+        items.push(it);
+        elGrid.appendChild(makeCard(it));
+      }
+
+      refreshSeqBadges();
+    }
+
+    async function rasterizePdfToCanvas(file){
+      const data = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data }).promise;
+      const page = await pdf.getPage(1);
+
+      // 出力650x528に対して十分な解像を確保（2倍目安）
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.max((TARGET_W * 2) / base.width, (TARGET_H * 2) / base.height);
+      const viewport = page.getViewport({ scale });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      return canvas;
+    }
+
+    function containResizeDims(srcW, srcH, dstW, dstH){
+      const scale = Math.min(dstW / srcW, dstH / srcH);
+      return {
+        w: Math.max(1, Math.round(srcW * scale)),
+        h: Math.max(1, Math.round(srcH * scale)),
+      };
+    }
+
+    async function renderToJpegBytesFromMagickImage(img, kind){
+      // kind: "image" | "pdf"
+      // 向き補正
+      try { img.autoOrient(); } catch {}
+
+      // 透明は白で潰す
+      img.backgroundColor = Magick.MagickColors.White;
+      try { img.alpha(Magick.AlphaAction.Remove); } catch {}
+
+      // ---- 色管理（希望ルール）----
+      // sRGBプロファイルがないと「指定プロファイルとしての出力」ができないので警告
+      const warnings = [];
+
+      if(!srgbProfile){
+        warnings.push("sRGB ICC未指定（出力はsRGB相当の可能性）");
+      }
+
+      if(kind === "pdf"){
+        // PDFは既にラスタ化済み（ブラウザ側色処理の影響を受ける可能性がある）
+        if(srgbProfile) img.setProfile(srgbProfile);
+      } else {
+        const cs = img.colorSpace;
+
+        if(cs === Magick.ColorSpace.CMYK || cs === Magick.ColorSpace.CMY){
+          if(japanProfile && srgbProfile){
+            const ok = img.transformColorSpace(japanProfile, srgbProfile, Magick.ColorTransformMode.HighRes);
+            if(!ok) warnings.push("CMYK→sRGB変換失敗");
+            img.setProfile(srgbProfile);
+          } else {
+            warnings.push("CMYKだがICC不足（JapanColor/sRGB）");
+            // 最低限：可能ならsRGBプロファイルだけ付ける（ただし厳密ではない）
+            if(srgbProfile) img.setProfile(srgbProfile);
+          }
+        } else {
+          // RGB系
+          if(srgbProfile){
+            const src = img.getColorProfile(); // embedded ICC
+            if(src){
+              const ok = img.transformColorSpace(src, srgbProfile, Magick.ColorTransformMode.HighRes);
+              if(!ok) warnings.push("ICC→sRGB変換失敗");
+              img.setProfile(srgbProfile);
+            } else {
+              // ICC無しは「sRGBとして扱う」運用（警告はタイル側で既に出している）
+              img.setProfile(srgbProfile);
+            }
+          }
+        }
+      }
+
+      // ---- サイズ合わせ（トリミング無し / 白余白）----
+      const dims = containResizeDims(img.width, img.height, TARGET_W, TARGET_H);
+      img.resize(dims.w, dims.h);
+
+      // 中央配置で 650x528 に extent
+      img.extent(TARGET_W, TARGET_H, Magick.Gravity.Center, Magick.MagickColors.White);
+
+      // ---- 出力設定 ----
+      img.density = new Magick.Density(OUT_DPI, OUT_DPI, Magick.DensityUnit.PixelsPerInch);
+      img.quality = OUT_QUALITY;
+
+      // JPEGで書き出し
+      const outU8 = await magickWriteCopyU8(img, Magick.MagickFormat.Jpeg);
+      return { outU8, warnings };
+    }
+
+    async function processOneToJpegU8(it){
+      if(it.kind === "dummy"){
+        // ダミーは生成キャンバスから書き出す（必ずZIPに含める）
+        const canvas = makeDummyExportCanvas();
+        return await Magick.ImageMagick.readFromCanvas(canvas, async (img) => {
+          try{
+            // 既に650x528だが、共通パスで確実に設定・出力する
+            return await renderToJpegBytesFromMagickImage(img, "image");
+          } finally {
+            img.dispose();
+          }
+        }, { alpha: false });
+      }
+
+      if(it.kind === "pdf"){
+        const canvas = await rasterizePdfToCanvas(it.file);
+        return await Magick.ImageMagick.readFromCanvas(canvas, async (img) => {
+          try{
+            return await renderToJpegBytesFromMagickImage(img, "pdf");
+          } finally {
+            img.dispose();
+          }
+        }, { alpha: false });
+      } else {
+        const u8 = await readFileAsU8(it.file);
+        return await Magick.ImageMagick.read(u8, async (img) => {
+          try{
+            return await renderToJpegBytesFromMagickImage(img, "image");
+          } finally {
+            img.dispose();
+          }
+        });
+      }
+    }
+
+    async function exportZip(){
+      const prefix = (elPrefix.value || "").trim();
+      if(!prefix){
+        alert("固定名（prefix）を入力してください");
+        return;
+      }
+      if(!magickReady){
+        alert("ImageMagickの初期化が完了していません");
+        return;
+      }
+
+      const digits = currentDigits();
+      const zip = new JSZip();
+
+      setStatus("書き出し中…");
+      log("export start. items=" + items.length);
+
+      for(let i=0;i<items.length;i++){
+        const it = items[i];
+        const seq = i + 1;
+
+        if(it.excluded){
+          log("skip (excluded): " + it.file.name + " => " + pad(seq, digits));
+          continue; // 連番は詰めない（運用ルール）
+        }
+
+        try{
+          const { outU8, warnings } = await processOneToJpegU8(it);
+          const outName = `${prefix}${pad(seq, digits)}.jpg`;
+          zip.file(outName, outU8, { binary: true });
+
+          if(warnings.length){
+            log("warn: " + outName + " / " + warnings.join(", "));
+          } else {
+            log("ok: " + outName);
+          }
+        }catch(e){
+          log("ERROR: " + it.file.name + " / " + (e?.message ?? e));
+        }
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${prefix}.zip`;
+      a.click();
+
+      setStatus("完了");
+      log("export done: " + a.download);
+    }
+
+    function clearAll(){
+      // revoke object urls
+      for(const it of items){
+        if(it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+      }
+      items.length = 0;
+      elGrid.innerHTML = "";
+      refreshSeqBadges();
+      setStatus(magickReady ? "待機中" : "初期化中…");
+      log("cleared");
+    }
+
+    // ---- D&D ----
+    elDrop.addEventListener("dragover", (e)=>{ e.preventDefault(); elDrop.style.borderColor="#6aa9ff"; });
+    elDrop.addEventListener("dragleave", ()=>{ elDrop.style.borderColor=""; });
+    elDrop.addEventListener("drop", async (e)=>{
+      e.preventDefault();
+      elDrop.style.borderColor="";
+      const files = [...(e.dataTransfer?.files ?? [])];
+      if(!files.length) return;
+      await addFiles(files);
+      updateItemOrderFromDOM();
+    });
+
+    // ---- sortable ----
+    new Sortable(elGrid, {
+      group: { name: "grid", pull: true, put: true },
+      animation: 150,
+      onChoose: (evt) => {
+        draggingId = evt?.item?.dataset?.id || null;
+      },
+      onUnchoose: () => {
+        draggingId = null;
+        elTrash?.classList.remove("hi");
+      },
+      onEnd: (evt) => {
+        // ゴミ箱上でドロップされた場合（dropイベントが拾えない環境の保険）
+        try{
+          const oe = evt?.originalEvent;
+          if(oe && elTrash){
+            const r = elTrash.getBoundingClientRect();
+            const over = oe.clientX >= r.left && oe.clientX <= r.right && oe.clientY >= r.top && oe.clientY <= r.bottom;
+            if(over){
+              deleteCardById(evt?.item?.dataset?.id || draggingId || "");
+              return;
+            }
+          }
+        }catch{}
+        updateItemOrderFromDOM();
+        log("reordered");
+      }
+    });
+    // ---- trash (drag here to delete) ----
+    const elTrash = document.getElementById("trash");
+    let draggingId = null;
+
+    // SortableJS uses native DnD. We just remember which card is being dragged,
+    // and delete it when dropped onto the trash area (without moving DOM into trash).
+    elGrid.addEventListener("dragstart", (e) => {
+      const card = e.target?.closest?.(".card");
+      if(!card) return;
+      draggingId = card.dataset.id || null;
+      try{
+        e.dataTransfer?.setData("text/plain", draggingId || "");
+        e.dataTransfer.effectAllowed = "move";
+      }catch{}
+    }, true);
+
+    elGrid.addEventListener("dragend", () => {
+      draggingId = null;
+      elTrash?.classList.remove("hi");
+    });
+
+    function deleteCardById(id){
+      if(!id) return;
+      const idx = items.findIndex(x => x.id === id);
+      if(idx >= 0){
+        const it = items[idx];
+        if(it?.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+        items.splice(idx, 1);
+      }
+      const card = elGrid.querySelector(`.card[data-id="${id}"]`);
+      card?.remove();
+      refreshSeqBadges();
+      log("deleted: " + id);
+    }
+
+    if(elTrash){
+      elTrash.addEventListener("dragenter", (e) => {
+        e.preventDefault();
+        elTrash.classList.add("hi");
+      });
+      elTrash.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        elTrash.classList.add("hi");
+        try{ e.dataTransfer.dropEffect = "move"; }catch{}
+      });
+      elTrash.addEventListener("dragleave", (e) => {
+        const rt = e.relatedTarget;
+        if(rt && elTrash.contains(rt)) return;
+        elTrash.classList.remove("hi");
+      });
+      elTrash.addEventListener("drop", (e) => {
+        e.preventDefault();
+        elTrash.classList.remove("hi");
+
+        // ignore dropping local files onto the trash area
+        if(e.dataTransfer?.files && e.dataTransfer.files.length > 0) return;
+
+        const id = (e.dataTransfer?.getData("text/plain") || draggingId || "").trim();
+        // wait a tick so Sortable finishes its end/cancel logic
+        setTimeout(() => deleteCardById(id), 0);
+      });
+    }
+
+
+    // ---- buttons ----
+    elBtnDummy.addEventListener("click", ()=>{
+      addDummy();
+      updateItemOrderFromDOM();
+    });
+
+    elBtnExport.addEventListener("click", async ()=>{
+      const ok = await showConfirm({
+        title: "確認",
+        message: "ZIPを書き出します。よろしいですか？",
+        okText: "書き出し",
+        cancelText: "戻る",
+        okDanger: true
+      });
+      if(!ok) return;
+      await exportZip();
+    });
+
+    elBtnClear.addEventListener("click", async ()=>{
+      const ok = await showConfirm({
+        title: "確認",
+        message: "一覧をクリアします。よろしいですか？",
+        okText: "クリア",
+        cancelText: "戻る",
+        okDanger: true
+      });
+      if(!ok) return;
+      clearAll();
+    });
+    elPrefix.addEventListener("input", refreshSeqBadges);
+
+    // ---- icc inputs ----
+    elSrgbIcc.addEventListener("change", async ()=>{
+      const f = elSrgbIcc.files?.[0];
+      if(!f) return;
+      await setProfileFromInput(f, "srgb");
+      // 既存タイルの警告を更新したい場合は、運用に合わせて再解析を追加してOK
+    });
+    elJapanIcc.addEventListener("change", async ()=>{
+      const f = elJapanIcc.files?.[0];
+      if(!f) return;
+      await setProfileFromInput(f, "japan");
+    });
+
+    // ---- init ----
+    (async ()=>{
+      setStatus("ImageMagick 初期化中…");
+      log("init magick-wasm...");
+
+      // magick.wasm のURLを指定して初期化
+      await Magick.initializeImageMagick(new URL("https://cdn.jsdelivr.net/npm/@imagemagick/magick-wasm@0.0.37/dist/magick.wasm"));
+
+      magickReady = true;
+      setStatus("待機中（D&Dしてください）");
+      log("magick-wasm ready.");
+      // profilesの自動ロードは行いません（GitHub Pages上で404ログが出るのを避けるため）。必要なら上のファイル選択で指定してください。
+      await refreshTiffThumbnails();
+
+      refreshSeqBadges();
+    })().catch(err=>{
+      setStatus("初期化失敗");
+      log("FATAL init error: " + (err?.message ?? err));
+      console.error(err);
+    });
+  </script>
+</body>
+</html>
