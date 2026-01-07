@@ -135,6 +135,7 @@
     </div>
 
     <div class="row">
+      <button id="btnDummy" type="button">ダミー追加</button>
       <button id="btnExport" disabled>ZIPを書き出し</button>
       <button id="btnClear">クリア</button>
       <div id="trash" class="trash" title="ここにドラッグで削除">🗑</div>
@@ -180,7 +181,7 @@
       "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs";
 
     // ---- state ----
-    /** @type {{id:string, file:File, kind:"image"|"pdf", excluded:boolean, warnings:string[], info:{colorSpace?:string, hasIcc?:boolean}|null, thumbUrl?:string, thumbCanvas?:HTMLCanvasElement}[]} */
+    /** @type {{id:string, file:File, kind:"image"|"pdf"|"dummy", excluded:boolean, warnings:string[], info:{colorSpace?:string, hasIcc?:boolean}|null, thumbUrl?:string, thumbCanvas?:HTMLCanvasElement}[]} */
     const items = [];
 
     let srgbProfile = null;       // Magick.ColorProfile
@@ -193,6 +194,7 @@
     const elPrefix = document.getElementById("prefix");
     const elBtnExport = document.getElementById("btnExport");
     const elBtnClear = document.getElementById("btnClear");
+    const elBtnDummy = document.getElementById("btnDummy");
     const elStatus = document.getElementById("status");
     const elLog = document.getElementById("log");
     // ---- confirm modal ----
@@ -467,6 +469,35 @@
       return c;
     }
 
+    function makeSolidCanvas(w, h, color, labelText){
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, w, h);
+
+      // optional label (subtle)
+      if(labelText){
+        ctx.fillStyle = "rgba(0,0,0,.35)";
+        ctx.font = "bold 28px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(labelText, w/2, h/2);
+      }
+      return c;
+    }
+
+    function makeDummyThumbCanvas(){
+      // サムネはタイル枠に収まる程度でOK
+      return makeSolidCanvas(320, 180, "#b0b8bb", "DUMMY");
+    }
+
+    function makeDummyExportCanvas(){
+      // 出力用ダミー（#b0b8bb / 650x528）
+      return makeSolidCanvas(TARGET_W, TARGET_H, "#b0b8bb", null);
+    }
+
     async function buildTiffThumbnailUrl(file){
       // TIFFはブラウザの<img>で直接表示できないことが多いので、magick-wasmでサムネを作る
       const u8 = await readFileAsU8(file);
@@ -564,6 +595,28 @@
           img.dispose();
         }
       });
+    }
+
+
+    function addDummy(){
+      const id = crypto.randomUUID();
+      // Fileを実体として持たせる（名前表示用）。中身は空でOK（dummyは専用処理で書き出す）
+      const file = new File([], "DUMMY", { type: "application/octet-stream" });
+
+      const it = {
+        id,
+        file,
+        kind: "dummy",
+        excluded: false,
+        warnings: [],
+        info: { colorSpace: "DUMMY", hasIcc: false },
+        thumbCanvas: makeDummyThumbCanvas()
+      };
+
+      items.push(it);
+      elGrid.appendChild(makeCard(it));
+      refreshSeqBadges();
+      log("dummy added");
     }
 
     async function addFiles(files){
@@ -713,6 +766,19 @@
     }
 
     async function processOneToJpegU8(it){
+      if(it.kind === "dummy"){
+        // ダミーは生成キャンバスから書き出す（必ずZIPに含める）
+        const canvas = makeDummyExportCanvas();
+        return await Magick.ImageMagick.readFromCanvas(canvas, async (img) => {
+          try{
+            // 既に650x528だが、共通パスで確実に設定・出力する
+            return await renderToJpegBytesFromMagickImage(img, "image");
+          } finally {
+            img.dispose();
+          }
+        }, { alpha: false });
+      }
+
       if(it.kind === "pdf"){
         const canvas = await rasterizePdfToCanvas(it.file);
         return await Magick.ImageMagick.readFromCanvas(canvas, async (img) => {
@@ -902,6 +968,11 @@
 
 
     // ---- buttons ----
+    elBtnDummy.addEventListener("click", ()=>{
+      addDummy();
+      updateItemOrderFromDOM();
+    });
+
     elBtnExport.addEventListener("click", async ()=>{
       const ok = await showConfirm({
         title: "確認",
