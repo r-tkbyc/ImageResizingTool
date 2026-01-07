@@ -12,7 +12,7 @@
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Noto Sans JP,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    header{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    header{padding:28px 14px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px;align-items:stretch}
     header h1{font-size:14px;margin:0}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     label{font-size:12px;color:var(--muted)}
@@ -23,6 +23,17 @@
       background:#132033;color:var(--text);cursor:pointer
     }
     button:disabled{opacity:.5;cursor:not-allowed}
+
+    header h1{margin:0;font-size:14px}
+    input[type="file"]{width:380px;max-width:100%}
+    .outname{font-size:12px;color:var(--muted);line-height:1.2;word-break:break-all}
+    .trash{
+      width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+      border:1px dashed rgba(255,107,107,.7);border-radius:10px;background:rgba(255,107,107,.08);
+      user-select:none
+    }
+    .trash.hi{background:rgba(255,107,107,.18)}
+
     .container{padding:14px;display:grid;gap:12px}
     .drop{
       border:1px dashed #3a4b5f;border-radius:14px;padding:16px;background:rgba(17,26,36,.6);
@@ -73,7 +84,7 @@
   </style>
 </head>
 <body>
-  <div class="ver">Ver_1.0.0</div>
+  <div class="ver">Ver_1.0.1</div>
   <header>
     <h1>商品画像リサイズ（650×528 / JPEG Q100 / 144dpi / ICC→sRGB / ZIP）</h1>
 
@@ -92,6 +103,7 @@
     <div class="row">
       <button id="btnExport" disabled>ZIPを書き出し</button>
       <button id="btnClear">クリア</button>
+      <div id="trash" class="trash" title="ここにドラッグで削除">🗑</div>
       <span id="status" class="small">初期化中…</span>
     </div>
   </header>
@@ -164,6 +176,26 @@
       return s.length >= width ? s : "0".repeat(width - s.length) + s;
     }
 
+
+    // ★重要：Magickのwriteが返すdataは寿命が短いので、必ずコピーして保持する
+    async function magickWriteCopyU8(img, format){
+      let out = null;
+      const maybePromise = img.write(format, (data) => {
+        out = new Uint8Array(data); // ここでコピー
+      });
+      if(maybePromise && typeof maybePromise.then === "function"){
+        await maybePromise;
+      }
+      if(!out || out.length < 4){
+        throw new Error("JPEG書き出しに失敗しました（出力が空）");
+      }
+      // JPEG SOI (FF D8)
+      if(!(out[0] === 0xFF && out[1] === 0xD8)){
+        throw new Error("JPEG書き出しが壊れています（SOIがありません）");
+      }
+      return out;
+    }
+
     function currentDigits(){
       // 「入力総数」が100超えたら3桁（除外しても詰めない運用なので、総数基準にする）
       return items.length >= 100 ? 3 : 2;
@@ -172,10 +204,15 @@
     function refreshSeqBadges(){
       const cards = [...elGrid.querySelectorAll(".card")];
       const digits = currentDigits();
+      const prefix = (elPrefix.value || "").trim() || "output";
       cards.forEach((card, idx)=>{
         const seq = idx + 1;
+        const seqStr = pad(seq, digits);
         const seqEl = card.querySelector(".seq");
-        if(seqEl) seqEl.textContent = pad(seq, digits);
+        if(seqEl) seqEl.textContent = seqStr;
+
+        const outEl = card.querySelector(".outname");
+        if(outEl) outEl.textContent = `${prefix}${seqStr}.jpg`;
       });
       // exportボタン
       elBtnExport.disabled = !magickReady || items.length === 0;
@@ -231,7 +268,11 @@
       fname.className = "fname";
       fname.textContent = it.file.name;
 
-      const badges = document.createElement("div");
+      
+
+      const outname = document.createElement("div");
+      outname.className = "outname";
+      outname.textContent = "";const badges = document.createElement("div");
       badges.className = "badges";
 
       // kind badge
@@ -262,6 +303,7 @@
       }
 
       meta.appendChild(fname);
+      meta.appendChild(outname);
       meta.appendChild(badges);
 
       card.appendChild(seq);
@@ -580,7 +622,7 @@
       img.quality = OUT_QUALITY;
 
       // JPEGで書き出し
-      const outU8 = await img.write(Magick.MagickFormat.Jpeg, (data) => data);
+      const outU8 = await magickWriteCopyU8(img, Magick.MagickFormat.Jpeg);
       return { outU8, warnings };
     }
 
@@ -635,7 +677,7 @@
         try{
           const { outU8, warnings } = await processOneToJpegU8(it);
           const outName = `${prefix}${pad(seq, digits)}.jpg`;
-          zip.file(outName, outU8);
+          zip.file(outName, outU8, { binary: true });
 
           if(warnings.length){
             log("warn: " + outName + " / " + warnings.join(", "));
@@ -683,16 +725,49 @@
 
     // ---- sortable ----
     new Sortable(elGrid, {
+      group: { name: "grid", pull: true, put: true },
       animation: 150,
       onEnd: () => {
         updateItemOrderFromDOM();
         log("reordered");
       }
     });
+    // ---- trash (drag here to delete) ----
+    const elTrash = document.getElementById("trash");
+    if(elTrash){
+      new Sortable(elTrash, {
+        group: { name: "grid", put: true, pull: false },
+        sort: false,
+        onAdd: (evt) => {
+          const card = evt.item;
+          const id = card?.dataset?.id;
+          // いったんDOMから外れたカードは即削除（うっかり防止のため領域は小さめ）
+          if(id){
+            const idx = items.findIndex(x => x.id === id);
+            if(idx >= 0){
+              const it = items[idx];
+              if(it?.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+              items.splice(idx, 1);
+            }
+          }
+          card?.remove();
+          // ゴミ箱内は空に戻す
+          elTrash.innerHTML = "🗑";
+          refreshSeqBadges();
+        }
+      });
+
+      // small highlight
+      elTrash.addEventListener("dragenter", ()=> elTrash.classList.add("hi"));
+      elTrash.addEventListener("dragleave", ()=> elTrash.classList.remove("hi"));
+      elTrash.addEventListener("drop", ()=> elTrash.classList.remove("hi"));
+    }
+
 
     // ---- buttons ----
     elBtnExport.addEventListener("click", exportZip);
     elBtnClear.addEventListener("click", clearAll);
+    elPrefix.addEventListener("input", refreshSeqBadges);
 
     // ---- icc inputs ----
     elSrgbIcc.addEventListener("change", async ()=>{
@@ -718,8 +793,7 @@
       magickReady = true;
       setStatus("待機中（D&Dしてください）");
       log("magick-wasm ready.");
-
-      await tryAutoLoadProfiles();
+      // profilesの自動ロードは行いません（GitHub Pages上で404ログが出るのを避けるため）。必要なら上のファイル選択で指定してください。
       await refreshTiffThumbnails();
 
       refreshSeqBadges();
