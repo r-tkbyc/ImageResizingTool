@@ -107,7 +107,7 @@
   </style>
 </head>
 <body>
-  <div class="ver">Ver_1.0.3</div>
+  <div class="ver">Ver_1.0.4</div>
 
   <div id="confirmOverlay" class="modal hidden" aria-hidden="true">
     <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMsg">
@@ -183,6 +183,15 @@
     // ---- state ----
     /** @type {{id:string, file:File, kind:"image"|"pdf"|"dummy", excluded:boolean, warnings:string[], info:{colorSpace?:string, hasIcc?:boolean}|null, thumbUrl?:string, thumbCanvas?:HTMLCanvasElement}[]} */
     const items = [];
+
+    // ---- warn on refresh / tab close when there are items ----
+    window.addEventListener("beforeunload", (e) => {
+      // Show standard browser warning only when there is something in the list.
+      if (items.length === 0) return;
+      e.preventDefault();
+      // Most browsers ignore the custom message and show a standard prompt.
+      e.returnValue = "";
+    });
 
     let srgbProfile = null;       // Magick.ColorProfile
     let japanProfile = null;      // Magick.ColorProfile
