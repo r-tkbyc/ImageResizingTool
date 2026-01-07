@@ -28,9 +28,10 @@
     input[type="file"]{width:380px;max-width:100%}
     .outname{font-size:12px;color:var(--muted);line-height:1.2;word-break:break-all}
     .trash{
-      width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+      width:34px;height:34px;min-width:34px;min-height:34px;flex:0 0 34px;
+      display:flex;align-items:center;justify-content:center;
       border:1px dashed rgba(255,107,107,.7);border-radius:10px;background:rgba(255,107,107,.08);
-      user-select:none
+      user-select:none;overflow:hidden;contain:layout paint;
     }
     .trash.hi{background:rgba(255,107,107,.18)}
 
@@ -734,33 +735,65 @@
     });
     // ---- trash (drag here to delete) ----
     const elTrash = document.getElementById("trash");
-    if(elTrash){
-      new Sortable(elTrash, {
-        group: { name: "grid", put: true, pull: false },
-        sort: false,
-        onAdd: (evt) => {
-          const card = evt.item;
-          const id = card?.dataset?.id;
-          // いったんDOMから外れたカードは即削除（うっかり防止のため領域は小さめ）
-          if(id){
-            const idx = items.findIndex(x => x.id === id);
-            if(idx >= 0){
-              const it = items[idx];
-              if(it?.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
-              items.splice(idx, 1);
-            }
-          }
-          card?.remove();
-          // ゴミ箱内は空に戻す
-          elTrash.innerHTML = "🗑";
-          refreshSeqBadges();
-        }
-      });
+    let draggingId = null;
 
-      // small highlight
-      elTrash.addEventListener("dragenter", ()=> elTrash.classList.add("hi"));
-      elTrash.addEventListener("dragleave", ()=> elTrash.classList.remove("hi"));
-      elTrash.addEventListener("drop", ()=> elTrash.classList.remove("hi"));
+    // SortableJS uses native DnD. We just remember which card is being dragged,
+    // and delete it when dropped onto the trash area (without moving DOM into trash).
+    elGrid.addEventListener("dragstart", (e) => {
+      const card = e.target?.closest?.(".card");
+      if(!card) return;
+      draggingId = card.dataset.id || null;
+      try{
+        e.dataTransfer?.setData("text/plain", draggingId || "");
+        e.dataTransfer.effectAllowed = "move";
+      }catch{}
+    }, true);
+
+    elGrid.addEventListener("dragend", () => {
+      draggingId = null;
+      elTrash?.classList.remove("hi");
+    });
+
+    function deleteCardById(id){
+      if(!id) return;
+      const idx = items.findIndex(x => x.id === id);
+      if(idx >= 0){
+        const it = items[idx];
+        if(it?.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+        items.splice(idx, 1);
+      }
+      const card = elGrid.querySelector(`.card[data-id="${id}"]`);
+      card?.remove();
+      refreshSeqBadges();
+      log("deleted: " + id);
+    }
+
+    if(elTrash){
+      elTrash.addEventListener("dragenter", (e) => {
+        e.preventDefault();
+        elTrash.classList.add("hi");
+      });
+      elTrash.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        elTrash.classList.add("hi");
+        try{ e.dataTransfer.dropEffect = "move"; }catch{}
+      });
+      elTrash.addEventListener("dragleave", (e) => {
+        const rt = e.relatedTarget;
+        if(rt && elTrash.contains(rt)) return;
+        elTrash.classList.remove("hi");
+      });
+      elTrash.addEventListener("drop", (e) => {
+        e.preventDefault();
+        elTrash.classList.remove("hi");
+
+        // ignore dropping local files onto the trash area
+        if(e.dataTransfer?.files && e.dataTransfer.files.length > 0) return;
+
+        const id = (e.dataTransfer?.getData("text/plain") || draggingId || "").trim();
+        // wait a tick so Sortable finishes its end/cancel logic
+        setTimeout(() => deleteCardById(id), 0);
+      });
     }
 
 
