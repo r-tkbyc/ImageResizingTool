@@ -69,9 +69,11 @@
       border:1px solid var(--line);border-radius:14px;background:#0f1620;padding:10px;white-space:pre-wrap;
       font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--muted)
     }
+      .ver{position:fixed;left:6px;top:6px;font-size:11px;color:#ff3b3b;z-index:9999;pointer-events:none;}
   </style>
 </head>
 <body>
+  <div class="ver">Ver_1.0.0</div>
   <header>
     <h1>商品画像リサイズ（650×528 / JPEG Q100 / 144dpi / ICC→sRGB / ZIP）</h1>
 
@@ -314,6 +316,93 @@
       return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
     }
 
+    function isTiff(file){
+      return file.type === "image/tiff" || /\.tiff?$/i.test(file.name);
+    }
+
+    function makePlaceholderCanvas(label){
+      const c = document.createElement("canvas");
+      c.width = 320;
+      c.height = 180;
+      c.dataset.placeholder = "1";
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#0f1620";
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.strokeStyle = "#22303e";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, c.width - 2, c.height - 2);
+      ctx.fillStyle = "#93a4b5";
+      ctx.font = "bold 28px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, c.width / 2, c.height / 2);
+      return c;
+    }
+
+    async function buildTiffThumbnailUrl(file){
+      // TIFFはブラウザの<img>で直接表示できないことが多いので、magick-wasmでサムネを作る
+      const u8 = await readFileAsU8(file);
+      return await Magick.ImageMagick.read(u8, async (img) => {
+        try{
+          try{ img.autoOrient(); } catch {}
+          img.backgroundColor = Magick.MagickColors.White;
+          try{ img.alpha(Magick.AlphaAction.Remove); } catch {}
+
+          // サムネは軽量優先（見た目確認用）
+          const MAX_W = 320;
+          const MAX_H = 240;
+          const dims = containResizeDims(img.width, img.height, MAX_W, MAX_H);
+          img.resize(dims.w, dims.h);
+
+          img.quality = 85;
+          const thumbU8 = await magickWriteCopyU8(img, Magick.MagickFormat.Jpeg);
+          const blob = new Blob([thumbU8], { type: "image/jpeg" });
+          return URL.createObjectURL(blob);
+        } finally {
+          img.dispose();
+        }
+      });
+    }
+
+    async function refreshTiffThumbnails(){
+      // 初期化前に投入されたTIFFを、初期化後にサムネ生成して差し替える
+      const tasks = [];
+      for(const it of items){
+        if(it.kind !== "image") continue;
+        if(!isTiff(it.file)) continue;
+        if(it.thumbUrl && !it.thumbCanvas) continue;
+
+        tasks.push((async () => {
+          try{
+            const url = await buildTiffThumbnailUrl(it.file);
+            it.thumbUrl = url;
+            delete it.thumbCanvas;
+            it.warnings = (it.warnings || []).filter(w => w !== "TIFFサムネは初期化後");
+
+            const card = elGrid.querySelector(`.card[data-id="${it.id}"]`);
+            if(card){
+              const thumbDiv = card.querySelector(".thumb");
+              if(thumbDiv){
+                thumbDiv.innerHTML = "";
+                const img = document.createElement("img");
+                img.alt = it.file.name;
+                img.src = it.thumbUrl || "";
+                thumbDiv.appendChild(img);
+              }
+            }
+          } catch (e) {
+            // 失敗時はプレースホルダのまま
+            if(!it.thumbCanvas) it.thumbCanvas = makePlaceholderCanvas("TIFF");
+            if(!(it.warnings || []).includes("TIFFサムネ失敗")) it.warnings.push("TIFFサムネ失敗");
+          }
+        })());
+      }
+      if(tasks.length){
+        await Promise.all(tasks);
+      }
+    }
+
+
     async function buildPdfThumbnailAndInfo(file){
       // 低負荷のサムネ用レンダリング
       const data = await file.arrayBuffer();
@@ -360,7 +449,22 @@
           it.info = info;
           it.warnings.push(...warnings);
         } else {
-          it.thumbUrl = URL.createObjectURL(file);
+          if(isTiff(file)){
+            it.warnings.push("TIFF");
+            if(magickReady){
+              try{
+                it.thumbUrl = await buildTiffThumbnailUrl(file);
+              }catch(e){
+                it.warnings.push("TIFFサムネ失敗");
+                it.thumbCanvas = makePlaceholderCanvas("TIFF");
+              }
+            } else {
+              it.warnings.push("TIFFサムネは初期化後");
+              it.thumbCanvas = makePlaceholderCanvas("TIFF");
+            }
+          } else {
+            it.thumbUrl = URL.createObjectURL(file);
+          }
 
           // magickで解析（CMYK検知など）
           try{
@@ -413,31 +517,6 @@
         w: Math.max(1, Math.round(srcW * scale)),
         h: Math.max(1, Math.round(srcH * scale)),
       };
-    }
-
-    async function magickWriteCopyU8(img, format){
-      let out = null;
-
-      // writeの戻りがPromiseの場合もあるので吸収
-      const maybePromise = img.write(format, (data) => {
-        // ★重要：ここで必ずコピーする（参照を保持しない）
-        out = new Uint8Array(data);
-      });
-
-      if (maybePromise && typeof maybePromise.then === "function") {
-        await maybePromise;
-      }
-
-      if (!out || out.length < 4) {
-        throw new Error("JPEG書き出しに失敗しました（出力データが空）");
-      }
-
-      // 念のためJPEGシグネチャ確認（SOI: FF D8）
-      if (!(out[0] === 0xFF && out[1] === 0xD8)) {
-        throw new Error("JPEG書き出しが壊れています（SOIがありません）");
-      }
-
-      return out;
     }
 
     async function renderToJpegBytesFromMagickImage(img, kind){
@@ -501,7 +580,7 @@
       img.quality = OUT_QUALITY;
 
       // JPEGで書き出し
-      const outU8 = await magickWriteCopyU8(img, Magick.MagickFormat.Jpeg);
+      const outU8 = await img.write(Magick.MagickFormat.Jpeg, (data) => data);
       return { outU8, warnings };
     }
 
@@ -556,7 +635,7 @@
         try{
           const { outU8, warnings } = await processOneToJpegU8(it);
           const outName = `${prefix}${pad(seq, digits)}.jpg`;
-          zip.file(outName, outU8, { binary: true });
+          zip.file(outName, outU8);
 
           if(warnings.length){
             log("warn: " + outName + " / " + warnings.join(", "));
@@ -641,6 +720,7 @@
       log("magick-wasm ready.");
 
       await tryAutoLoadProfiles();
+      await refreshTiffThumbnails();
 
       refreshSeqBadges();
     })().catch(err=>{
