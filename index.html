@@ -33,7 +33,8 @@
       border:1px dashed rgba(255,107,107,.7);border-radius:10px;background:rgba(255,107,107,.08);
       user-select:none;overflow:hidden;contain:layout paint;
     }
-    .trash.hi{background:rgba(255,107,107,.18)}
+    .trash{transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, transform .12s ease;}
+    .trash.hi{background:rgba(255,107,107,.22);border-color:rgba(255,107,107,.95);box-shadow:0 0 0 2px rgba(255,107,107,.25) inset;color:#ff6b6b;transform:scale(1.06)}
 
     .container{padding:14px;display:grid;gap:12px}
     .drop{
@@ -85,7 +86,7 @@
   </style>
 </head>
 <body>
-  <div class="ver">Ver_1.0.1</div>
+  <div class="ver">Ver_1.0.2</div>
   <header>
     <h1>商品画像リサイズ（650×528 / JPEG Q100 / 144dpi / ICC→sRGB / ZIP）</h1>
 
@@ -728,7 +729,26 @@
     new Sortable(elGrid, {
       group: { name: "grid", pull: true, put: true },
       animation: 150,
-      onEnd: () => {
+      onChoose: (evt) => {
+        draggingId = evt?.item?.dataset?.id || null;
+      },
+      onUnchoose: () => {
+        draggingId = null;
+        elTrash?.classList.remove("hi");
+      },
+      onEnd: (evt) => {
+        // ゴミ箱上でドロップされた場合（dropイベントが拾えない環境の保険）
+        try{
+          const oe = evt?.originalEvent;
+          if(oe && elTrash){
+            const r = elTrash.getBoundingClientRect();
+            const over = oe.clientX >= r.left && oe.clientX <= r.right && oe.clientY >= r.top && oe.clientY <= r.bottom;
+            if(over){
+              deleteCardById(evt?.item?.dataset?.id || draggingId || "");
+              return;
+            }
+          }
+        }catch{}
         updateItemOrderFromDOM();
         log("reordered");
       }
