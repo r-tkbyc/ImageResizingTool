@@ -35,7 +35,7 @@
     button:disabled{opacity:.5;cursor:not-allowed}
 
     header h1{font-size:13px;margin:0;color:var(--text)}
-    input[type="file"]{width:520px;max-width:100%}
+    input[type="file"]{width:300px;max-width:100%}
     .outname{font-size:12px;color:var(--muted);line-height:1.2;word-break:break-all}
     .trash{width:34px;height:34px;min-width:34px;min-height:34px;flex:0 0 34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:var(--radius);background:#2d2d2d;color:var(--muted);user-select:none;overflow:hidden;contain:layout paint;}
 .trash{transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, transform .12s ease;}
@@ -100,7 +100,7 @@
 </style>
 </head>
 <body>
-  <div class="ver">Ver_1.1.1</div>
+  <div class="ver">Ver_1.1.2</div>
 
   <div id="confirmOverlay" class="modal hidden" aria-hidden="true">
     <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMsg">
@@ -121,9 +121,9 @@
     </div>
 
     <div class="row">
-      <label>sRGB IEC61966-2.1</label>
+      <label>sRGB IEC61966-2.1:</label>
       <input id="srgbIcc" type="file" accept=".icc,.icm,application/octet-stream" />
-      <label>Japan Color 2001 Coated ICC</label>
+      <label>Japan Color 2001 Coated ICC:</label>
       <input id="japanIcc" type="file" accept=".icc,.icm,application/octet-stream" />
     </div>
 
