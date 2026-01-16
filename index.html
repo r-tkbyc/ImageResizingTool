@@ -30,6 +30,9 @@
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     label{font-size:12px;color:var(--muted)}
     input[type="text"]{height:26px;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control2);color:var(--text)}
+    input[type="number"]{height:26px;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control2);color:var(--text)}
+    #prefix{width:15ch}
+    #startNo{width:6ch;text-align:right}
     input[type="file"]{font-size:12px;color:var(--muted)}
     button{height:26px;padding:0 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control);color:var(--text);cursor:pointer}
     button:disabled{opacity:.5;cursor:not-allowed}
@@ -100,7 +103,7 @@
 </style>
 </head>
 <body>
-  <div class="ver">Ver_1.1.2</div>
+  <div class="ver">Ver_1.1.3</div>
 
   <div id="confirmOverlay" class="modal hidden" aria-hidden="true">
     <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMsg">
@@ -118,12 +121,14 @@
     <div class="row">
       <label>固定名（ZIP名にも使用）</label>
       <input id="prefix" type="text" value="260000pickup" />
+      <label>開始番号</label>
+      <input id="startNo" type="text" inputmode="numeric" pattern="[0-9]*" value="1" />
     </div>
 
     <div class="row">
-      <label>sRGB IEC61966-2.1:</label>
+      <label>sRGB IEC61966-2.1</label>
       <input id="srgbIcc" type="file" accept=".icc,.icm,application/octet-stream" />
-      <label>Japan Color 2001 Coated ICC:</label>
+      <label>Japan Color 2001 Coated ICC</label>
       <input id="japanIcc" type="file" accept=".icc,.icm,application/octet-stream" />
     </div>
 
@@ -194,6 +199,7 @@
     const elGrid = document.getElementById("grid");
     const elDrop = document.getElementById("drop");
     const elPrefix = document.getElementById("prefix");
+    const elStartNo = document.getElementById("startNo");
     const elBtnExport = document.getElementById("btnExport");
     const elBtnClear = document.getElementById("btnClear");
     const elBtnDummy = document.getElementById("btnDummy");
@@ -291,12 +297,19 @@
       return items.length >= 100 ? 3 : 2;
     }
 
+    function currentStartNo(){
+      const n = parseInt(elStartNo?.value || "1", 10);
+      return Number.isFinite(n) && n >= 1 ? n : 1;
+    }
+
     function refreshSeqBadges(){
       const cards = [...elGrid.querySelectorAll(".card")];
       const digits = currentDigits();
+      const startNo = currentStartNo();
       const prefix = (elPrefix.value || "").trim() || "output";
+
       cards.forEach((card, idx)=>{
-        const seq = idx + 1;
+        const seq = startNo + idx;
         const seqStr = pad(seq, digits);
         const seqEl = card.querySelector(".seq");
         if(seqEl) seqEl.textContent = seqStr;
@@ -814,6 +827,7 @@
       }
 
       const digits = currentDigits();
+      const startNo = currentStartNo();
       const zip = new JSZip();
 
       setStatus("書き出し中…");
@@ -821,7 +835,7 @@
 
       for(let i=0;i<items.length;i++){
         const it = items[i];
-        const seq = i + 1;
+        const seq = startNo + i;
 
         if(it.excluded){
           log("skip (excluded): " + it.file.name + " => " + pad(seq, digits));
@@ -999,6 +1013,19 @@
       clearAll();
     });
     elPrefix.addEventListener("input", refreshSeqBadges);
+    elStartNo.addEventListener("input", ()=>{
+      // 数字以外は落とす（上下カウントは不要なので直接入力前提）
+      const v = (elStartNo.value || "").replace(/[^0-9]/g, "");
+      // 空は許容（入力途中）→ 表示側はcurrentStartNo()で1扱い
+      elStartNo.value = v;
+      refreshSeqBadges();
+    });
+    elStartNo.addEventListener("blur", ()=>{
+      // 入力確定時に最低1へ
+      const n = parseInt(elStartNo.value || "1", 10);
+      if(!Number.isFinite(n) || n < 1) elStartNo.value = "1";
+      refreshSeqBadges();
+    });
 
     // ---- icc inputs ----
     elSrgbIcc.addEventListener("change", async ()=>{
