@@ -69,6 +69,10 @@
     .seq{position:absolute;left:10px;top:10px;background:#2d2d2d;border:1px solid var(--line);border-radius:var(--radius);padding:3px 6px;font-size:12px;color:var(--text)}
     .exclude{position:absolute;right:10px;top:10px;display:flex;align-items:center;gap:6px;background:#2d2d2d;border:1px solid var(--line);border-radius:var(--radius);padding:3px 6px;font-size:12px;color:var(--text)}
     .exclude input{width:14px;height:14px}
+    .opt400{position:absolute;right:10px;top:42px;display:flex;align-items:center;gap:6px;background:#2d2d2d;border:1px solid var(--line);border-radius:var(--radius);padding:3px 6px;font-size:12px;color:var(--text)}
+    .opt400 input{width:14px;height:14px}
+    .opt400.on{border-color:rgba(255,204,102,.5);color:var(--warn)}
+    .opt400.disabled{opacity:.6}
     .small{font-size:12px;color:var(--muted)}
     .footer{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .log{border:1px solid var(--line);border-radius:var(--radius);background:#2a2a2a;padding:10px;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--muted)}
@@ -119,9 +123,9 @@
     <h1>商品画像リサイズ（650×528 / JPEG Q100 / 144dpi / ICC→sRGB / ZIP）</h1>
 
     <div class="row">
-      <label>固定名（ZIP名にも使用）</label>
+      <label>固定名</label>
       <input id="prefix" type="text" value="260000pickup" />
-      <label>開始番号</label>
+      <label>　開始番号</label>
       <input id="startNo" type="text" inputmode="numeric" pattern="[0-9]*" value="1" />
     </div>
 
@@ -148,7 +152,7 @@
         <span>投入後にタイル表示 → 並び替え → 除外チェック → ZIP出力</span>
       </div>
       <div class="footer">
-        <span class="small">出力: 650×528 / 白余白 / Q100 / 144dpi / sRGB</span>
+        <span class="small">出力: 650×528（白余白）/ 400w（高さ自動）/ Q100 / 144dpi / sRGB</span>
       </div>
     </div>
 
@@ -171,6 +175,7 @@
     // ---- constants ----
     const TARGET_W = 650;
     const TARGET_H = 528;
+    const W400 = 400;
     const OUT_DPI = 144;
     const OUT_QUALITY = 100;
 
@@ -179,7 +184,7 @@
       "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs";
 
     // ---- state ----
-    /** @type {{id:string, file:File, kind:"image"|"pdf"|"dummy", excluded:boolean, warnings:string[], info:{colorSpace?:string, hasIcc?:boolean}|null, thumbUrl?:string, thumbCanvas?:HTMLCanvasElement}[]} */
+    /** @type {{id:string, file:File, kind:"image"|"pdf"|"dummy", excluded:boolean, use400:boolean, warnings:string[], info:{colorSpace?:string, hasIcc?:boolean}|null, thumbUrl?:string, thumbCanvas?:HTMLCanvasElement}[]} */
     const items = [];
 
     // ---- warn on refresh / tab close when there are items ----
@@ -350,8 +355,27 @@
       chk.checked = it.excluded;
       chk.addEventListener("change", ()=>{
         it.excluded = chk.checked;
+        // 除外中は400チェックを無効化（出力に影響しないので誤操作防止）
+        if(typeof chk400 !== "undefined" && chk400){
+          chk400.disabled = it.excluded;
+          opt400.classList.toggle("disabled", it.excluded);
+        }
         refreshSeqBadges(); // 連番は詰めないが、UI更新は必要
       });
+
+      const opt400 = document.createElement("label");
+      opt400.className = "opt400";
+      opt400.innerHTML = "<input type=\"checkbox\" />400";
+      const chk400 = opt400.querySelector("input");
+      chk400.checked = !!it.use400;
+      opt400.classList.toggle("on", chk400.checked);
+      chk400.addEventListener("change", ()=>{
+        it.use400 = chk400.checked;
+        opt400.classList.toggle("on", chk400.checked);
+      });
+      // 初期状態：除外なら無効
+      chk400.disabled = !!it.excluded;
+      opt400.classList.toggle("disabled", !!it.excluded);
 
       const thumb = document.createElement("div");
       thumb.className = "thumb";
@@ -411,6 +435,7 @@
 
       card.appendChild(seq);
       card.appendChild(exclude);
+      card.appendChild(opt400);
       card.appendChild(thumb);
       card.appendChild(meta);
       return card;
@@ -623,6 +648,7 @@
         file,
         kind: "dummy",
         excluded: false,
+        use400: false,
         warnings: [],
         info: { colorSpace: "DUMMY", hasIcc: false },
         thumbCanvas: makeDummyThumbCanvas()
@@ -637,7 +663,7 @@
     async function addFiles(files){
       for(const file of files){
         const id = crypto.randomUUID();
-        const it = { id, file, kind: isPdf(file) ? "pdf" : "image", excluded:false, warnings:[], info:null };
+        const it = { id, file, kind: isPdf(file) ? "pdf" : "image", excluded:false, use400:false, warnings:[], info:null };
 
         if(it.kind === "pdf"){
           const { canvas, info, warnings } = await buildPdfThumbnailAndInfo(file);
@@ -688,14 +714,20 @@
       refreshSeqBadges();
     }
 
-    async function rasterizePdfToCanvas(file){
+    async function rasterizePdfToCanvas(file, use400){
       const data = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data }).promise;
       const page = await pdf.getPage(1);
 
-      // 出力650x528に対して十分な解像を確保（2倍目安）
+      // 出力に対して十分な解像を確保（2倍目安）
       const base = page.getViewport({ scale: 1 });
-      const scale = Math.max((TARGET_W * 2) / base.width, (TARGET_H * 2) / base.height);
+      let scale;
+      if(use400){
+        // 幅400固定なので、幅基準で2倍程度
+        scale = Math.max((W400 * 2) / base.width, 1);
+      }else{
+        scale = Math.max((TARGET_W * 2) / base.width, (TARGET_H * 2) / base.height);
+      }
       const viewport = page.getViewport({ scale });
 
       const canvas = document.createElement("canvas");
@@ -715,7 +747,7 @@
       };
     }
 
-    async function renderToJpegBytesFromMagickImage(img, kind){
+    async function renderToJpegBytesFromMagickImage(img, kind, use400){
       // kind: "image" | "pdf"
       // 向き補正
       try { img.autoOrient(); } catch {}
@@ -764,12 +796,19 @@
         }
       }
 
-      // ---- サイズ合わせ（トリミング無し / 白余白）----
-      const dims = containResizeDims(img.width, img.height, TARGET_W, TARGET_H);
-      img.resize(dims.w, dims.h);
-
-      // 中央配置で 650x528 に extent
-      img.extent(TARGET_W, TARGET_H, Magick.Gravity.Center, Magick.MagickColors.White);
+      // ---- サイズ合わせ ----
+      if(use400){
+        // 幅400固定（縦は比率でなりゆき）
+        const w = W400;
+        const h = Math.max(1, Math.round(img.height * (w / Math.max(1, img.width))));
+        img.resize(w, h);
+      }else{
+        // 650x528（トリミング無し / 白余白）
+        const dims = containResizeDims(img.width, img.height, TARGET_W, TARGET_H);
+        img.resize(dims.w, dims.h);
+        // 中央配置で 650x528 に extent
+        img.extent(TARGET_W, TARGET_H, Magick.Gravity.Center, Magick.MagickColors.White);
+      }
 
       // ---- 出力設定 ----
       img.density = new Magick.Density(OUT_DPI, OUT_DPI, Magick.DensityUnit.PixelsPerInch);
@@ -781,13 +820,14 @@
     }
 
     async function processOneToJpegU8(it){
+      const use400 = !!it.use400;
       if(it.kind === "dummy"){
         // ダミーは生成キャンバスから書き出す（必ずZIPに含める）
         const canvas = makeDummyExportCanvas();
         return await Magick.ImageMagick.readFromCanvas(canvas, async (img) => {
           try{
             // 既に650x528だが、共通パスで確実に設定・出力する
-            return await renderToJpegBytesFromMagickImage(img, "image");
+            return await renderToJpegBytesFromMagickImage(img, "image", use400);
           } finally {
             img.dispose();
           }
@@ -795,10 +835,10 @@
       }
 
       if(it.kind === "pdf"){
-        const canvas = await rasterizePdfToCanvas(it.file);
+        const canvas = await rasterizePdfToCanvas(it.file, use400);
         return await Magick.ImageMagick.readFromCanvas(canvas, async (img) => {
           try{
-            return await renderToJpegBytesFromMagickImage(img, "pdf");
+            return await renderToJpegBytesFromMagickImage(img, "pdf", use400);
           } finally {
             img.dispose();
           }
@@ -807,7 +847,7 @@
         const u8 = await readFileAsU8(it.file);
         return await Magick.ImageMagick.read(u8, async (img) => {
           try{
-            return await renderToJpegBytesFromMagickImage(img, "image");
+            return await renderToJpegBytesFromMagickImage(img, "image", use400);
           } finally {
             img.dispose();
           }
