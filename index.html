@@ -24,7 +24,7 @@
       --focus:#5c9ded;
     }
 *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
     header{padding:36px 14px 12px;border-bottom:1px solid var(--line);background:#262626;display:flex;flex-direction:column;gap:10px;align-items:stretch}
     header h1{font-size:13px;margin:0;color:var(--text)}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -44,16 +44,14 @@
 .trash{transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, transform .12s ease;}
     .trash.hi{background:#3a2222;border-color:#7a2a2a;box-shadow:0 0 0 1px rgba(242,109,109,.12) inset;color:var(--err)}
 
-    .container{padding:14px;display:grid;gap:12px;flex:1;min-height:0;grid-template-rows:auto 1fr auto}
+    .container{padding:14px;display:grid;gap:12px}
     .drop{border:1px dashed #5a5a5a;border-radius:var(--radius);padding:14px;background:#303030;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .drop strong{font-size:13px}
     .drop span{font-size:12px;color:var(--muted)}
     .grid{
       display:grid;
       grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr));
-      gap:12px;
-      overflow:auto;
-      min-height:0
+      gap:12px
     }
     .card{
       border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
@@ -77,7 +75,7 @@
     .opt400.disabled{opacity:.6}
     .small{font-size:12px;color:var(--muted)}
     .footer{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .log{border:1px solid var(--line);border-radius:var(--radius);background:#2a2a2a;padding:10px;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--muted);max-height:22vh;overflow:auto}
+    .log{border:1px solid var(--line);border-radius:var(--radius);background:#2a2a2a;padding:10px;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--muted)}
       .ver{position:fixed;left:8px;top:8px;font-size:11px;color:#ff3b3b;z-index:9999;pointer-events:none;}
   
     /* confirm modal */
