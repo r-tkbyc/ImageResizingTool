@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>商品画像リサイズ（650x528 / ICC / ZIP）</title>
   <style>
-        :root{
+    :root{
       /* Unity-like dark theme */
       --bg:#2b2b2b;
       --panel:#3a3a3a;
@@ -23,9 +23,24 @@
       --active:#353535;
       --focus:#5c9ded;
     }
-*{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    header{padding:36px 14px 12px;border-bottom:1px solid var(--line);background:#262626;display:flex;flex-direction:column;gap:10px;align-items:stretch}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",Helvetica,Arial,sans-serif;
+      background:var(--bg);color:var(--text);
+      /* ★ページ全体はスクロールさせない（grid内のみスクロール） */
+      overflow:hidden;
+      display:flex;flex-direction:column;
+    }
+
+    header{
+      padding:36px 14px 12px;
+      border-bottom:1px solid var(--line);
+      background:#262626;
+      display:flex;flex-direction:column;gap:10px;align-items:stretch;
+      flex:0 0 auto;
+    }
     header h1{font-size:13px;margin:0;color:var(--text)}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     label{font-size:12px;color:var(--muted)}
@@ -33,78 +48,148 @@
     input[type="number"]{height:26px;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control2);color:var(--text)}
     #prefix{width:15ch}
     #startNo{width:6ch;text-align:right}
-    input[type="file"]{font-size:12px;color:var(--muted)}
+    input[type="file"]{font-size:12px;color:var(--muted);width:300px;max-width:100%}
     button{height:26px;padding:0 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control);color:var(--text);cursor:pointer}
     button:disabled{opacity:.5;cursor:not-allowed}
+    button:hover{background:var(--hover)}
+    button:active{background:var(--active)}
+    input[type="text"]:focus{outline:1px solid var(--focus);outline-offset:0}
+    button:focus-visible{outline:1px solid var(--focus);outline-offset:1px}
 
-    header h1{font-size:13px;margin:0;color:var(--text)}
-    input[type="file"]{width:300px;max-width:100%}
     .outname{font-size:12px;color:var(--muted);line-height:1.2;word-break:break-all}
-    .trash{width:34px;height:34px;min-width:34px;min-height:34px;flex:0 0 34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:var(--radius);background:#2d2d2d;color:var(--muted);user-select:none;overflow:hidden;contain:layout paint;}
-.trash{transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, transform .12s ease;}
+
+    .trash{
+      width:34px;height:34px;min-width:34px;min-height:34px;flex:0 0 34px;
+      display:flex;align-items:center;justify-content:center;
+      border:1px solid var(--line);border-radius:var(--radius);
+      background:#2d2d2d;color:var(--muted);
+      user-select:none;overflow:hidden;contain:layout paint;
+      transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, transform .12s ease;
+    }
     .trash.hi{background:#3a2222;border-color:#7a2a2a;box-shadow:0 0 0 1px rgba(242,109,109,.12) inset;color:var(--err)}
 
-    .container{padding:14px;display:grid;gap:12px}
-    .drop{border:1px dashed #5a5a5a;border-radius:var(--radius);padding:14px;background:#303030;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-.drop strong{font-size:13px}
+    /* ★メイン領域：高さを確実に分配するため min-height:0 が重要 */
+    .container{
+      padding:14px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      flex:1 1 auto;
+      min-height:0; /* ←これが無いと内側スクロールが壊れがち */
+    }
+
+    .drop{
+      border:1px dashed #5a5a5a;border-radius:var(--radius);
+      padding:14px;background:#303030;
+      display:flex;justify-content:space-between;align-items:center;
+      gap:10px;flex-wrap:wrap;
+      flex:0 0 auto;
+    }
+    .drop strong{font-size:13px}
     .drop span{font-size:12px;color:var(--muted)}
+    .footer{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .small{font-size:12px;color:var(--muted)}
+
+    /* ★gridを包む枠がスクロール担当 */
+    .gridWrap{
+      flex:1 1 auto;
+      min-height:0;     /* ←ここも重要 */
+      overflow:auto;    /* ←grid内のみスクロール */
+      border:1px solid rgba(0,0,0,0); /* クリック範囲安定用（見た目は変えない） */
+      padding-right:2px; /* スクロールバーで最後列が隠れにくくする */
+    }
+
     .grid{
       display:grid;
       grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr));
-      gap:12px
+      gap:12px;
+      /* ★要素が少ない時に“伸びない”指定 */
+      align-content:start;
+      align-items:start;
+      grid-auto-rows:auto;
     }
+
     .card{
-      border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
-      overflow:hidden;position:relative
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:var(--panel);
+      overflow:hidden;
+      position:relative;
+      /* ★縦に引き伸ばされない */
+      height:auto;
+      align-self:start;
     }
-    .thumb{width:100%;height:140px;background:#2d2d2d;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line)}
-    .thumb img, .thumb canvas{max-width:100%;max-height:100%;display:block}
+
+    .thumb{
+      width:100%;
+      height:140px;
+      background:#2d2d2d;
+      display:flex;align-items:center;justify-content:center;
+      border-bottom:1px solid var(--line)
+    }
+    .thumb img,.thumb canvas{max-width:100%;max-height:100%;display:block}
+
     .meta{padding:10px;display:grid;gap:6px}
     .fname{font-size:12px;line-height:1.2;word-break:break-all}
+
     .badges{display:flex;gap:6px;flex-wrap:wrap}
     .badge{font-size:11px;border:1px solid var(--line);border-radius:3px;padding:2px 6px;color:var(--muted);background:#2d2d2d}
     .badge.warn{border-color:rgba(255,204,102,.5);color:var(--warn)}
     .badge.err{border-color:rgba(255,107,107,.5);color:var(--err)}
     .badge.ok{border-color:rgba(107,255,149,.5);color:var(--ok)}
-    .seq{position:absolute;left:10px;top:10px;background:#2d2d2d;border:1px solid var(--line);border-radius:var(--radius);padding:3px 6px;font-size:12px;color:var(--text)}
-    .exclude{position:absolute;right:10px;top:10px;display:flex;align-items:center;gap:6px;background:#2d2d2d;border:1px solid var(--line);border-radius:var(--radius);padding:3px 6px;font-size:12px;color:var(--text)}
+
+    .seq{
+      position:absolute;left:10px;top:10px;
+      background:#2d2d2d;border:1px solid var(--line);
+      border-radius:var(--radius);padding:3px 6px;
+      font-size:12px;color:var(--text)
+    }
+    .exclude{
+      position:absolute;right:10px;top:10px;
+      display:flex;align-items:center;gap:6px;
+      background:#2d2d2d;border:1px solid var(--line);
+      border-radius:var(--radius);padding:3px 6px;
+      font-size:12px;color:var(--text)
+    }
     .exclude input{width:14px;height:14px}
-    .opt400{position:absolute;right:10px;top:42px;display:flex;align-items:center;gap:6px;background:#2d2d2d;border:1px solid var(--line);border-radius:var(--radius);padding:3px 6px;font-size:12px;color:var(--text)}
+    .opt400{
+      position:absolute;right:10px;top:42px;
+      display:flex;align-items:center;gap:6px;
+      background:#2d2d2d;border:1px solid var(--line);
+      border-radius:var(--radius);padding:3px 6px;
+      font-size:12px;color:var(--text)
+    }
     .opt400 input{width:14px;height:14px}
     .opt400.on{border-color:rgba(255,204,102,.5);color:var(--warn)}
     .opt400.disabled{opacity:.6}
-    .small{font-size:12px;color:var(--muted)}
-    .footer{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .log{border:1px solid var(--line);border-radius:var(--radius);background:#2a2a2a;padding:10px;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--muted)}
-      .ver{position:fixed;left:8px;top:8px;font-size:11px;color:#ff3b3b;z-index:9999;pointer-events:none;}
-  
-    /* confirm modal */
-    .modal{
-      position:fixed;inset:0;z-index:10000;
-      display:flex;align-items:center;justify-content:center;
-      background:rgba(0,0,0,.55);
-    }
-    .modal.hidden{display:none}
-    .modalCard{
-      width:min(420px, calc(100vw - 28px));
+
+    /* ★Logはウィンドウ下に貼り付け：ここ自体がスクロール */
+    .log{
+      flex:0 0 170px;
       border:1px solid var(--line);
       border-radius:var(--radius);
-      background:var(--panel);
-      box-shadow:0 10px 24px rgba(0,0,0,.35);
-      padding:14px;
+      background:#2a2a2a;
+      padding:10px;
+      overflow:auto;
+      white-space:pre-wrap;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+      font-size:12px;color:var(--muted)
     }
+
+    .ver{
+      position:fixed;left:8px;top:8px;font-size:11px;color:#ff3b3b;
+      z-index:9999;pointer-events:none;
+    }
+
+    /* confirm modal */
+    .modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);}
+    .modal.hidden{display:none}
+    .modalCard{width:min(420px, calc(100vw - 28px));border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:0 10px 24px rgba(0,0,0,.35);padding:14px;}
     .modalTitle{font-size:13px;margin:0 0 8px 0}
     .modalMsg{font-size:12px;color:var(--muted);line-height:1.5;white-space:pre-wrap;margin:0 0 12px 0}
     .modalActions{display:flex;gap:10px;justify-content:flex-end}
     .btnDanger{border-color:rgba(255,107,107,.55);box-shadow:0 0 0 1px rgba(255,107,107,.12) inset}
-
-  
-    button:hover{background:var(--hover)}
-    button:active{background:var(--active)}
-    input[type="text"]:focus{outline:1px solid var(--focus);outline-offset:0}
-
-    button:focus-visible{outline:1px solid var(--focus);outline-offset:1px}
-</style>
+  </style>
 </head>
 <body>
   <div class="ver">Ver_1.1.4</div>
@@ -119,6 +204,7 @@
       </div>
     </div>
   </div>
+
   <header>
     <h1>商品画像リサイズ（650×528 / JPEG Q100 / 144dpi / ICC→sRGB / ZIP）</h1>
 
@@ -156,14 +242,15 @@
       </div>
     </div>
 
-    <div id="grid" class="grid"></div>
+    <div class="gridWrap" id="gridWrap">
+      <div id="grid" class="grid"></div>
+    </div>
 
     <div id="log" class="log">Log:</div>
   </div>
 
   <!-- SortableJS -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-
   <!-- JSZip -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
@@ -189,10 +276,8 @@
 
     // ---- warn on refresh / tab close when there are items ----
     window.addEventListener("beforeunload", (e) => {
-      // Show standard browser warning only when there is something in the list.
       if (items.length === 0) return;
       e.preventDefault();
-      // Most browsers ignore the custom message and show a standard prompt.
       e.returnValue = "";
     });
 
@@ -210,6 +295,7 @@
     const elBtnDummy = document.getElementById("btnDummy");
     const elStatus = document.getElementById("status");
     const elLog = document.getElementById("log");
+
     // ---- confirm modal ----
     const elConfirmOverlay = document.getElementById("confirmOverlay");
     const elConfirmTitle = document.getElementById("confirmTitle");
@@ -266,17 +352,15 @@
     const elJapanIcc = document.getElementById("japanIcc");
 
     function log(msg){
-      elLog.textContent += "\\n" + msg;
+      elLog.textContent += "\n" + msg;
       elLog.scrollTop = elLog.scrollHeight;
     }
-
     function setStatus(msg){ elStatus.textContent = msg; }
 
     function pad(num, width){
       const s = String(num);
       return s.length >= width ? s : "0".repeat(width - s.length) + s;
     }
-
 
     // ★重要：Magickのwriteが返すdataは寿命が短いので、必ずコピーして保持する
     async function magickWriteCopyU8(img, format){
@@ -298,7 +382,6 @@
     }
 
     function currentDigits(){
-      // 「入力総数」が100超えたら3桁（除外しても詰めない運用なので、総数基準にする）
       return items.length >= 100 ? 3 : 2;
     }
 
@@ -322,7 +405,7 @@
         const outEl = card.querySelector(".outname");
         if(outEl) outEl.textContent = `${prefix}${seqStr}.jpg`;
       });
-      // exportボタン
+
       elBtnExport.disabled = !magickReady || items.length === 0;
     }
 
@@ -355,12 +438,11 @@
       chk.checked = it.excluded;
       chk.addEventListener("change", ()=>{
         it.excluded = chk.checked;
-        // 除外中は400チェックを無効化（出力に影響しないので誤操作防止）
         if(typeof chk400 !== "undefined" && chk400){
           chk400.disabled = it.excluded;
           opt400.classList.toggle("disabled", it.excluded);
         }
-        refreshSeqBadges(); // 連番は詰めないが、UI更新は必要
+        refreshSeqBadges();
       });
 
       const opt400 = document.createElement("label");
@@ -373,7 +455,6 @@
         it.use400 = chk400.checked;
         opt400.classList.toggle("on", chk400.checked);
       });
-      // 初期状態：除外なら無効
       chk400.disabled = !!it.excluded;
       opt400.classList.toggle("disabled", !!it.excluded);
 
@@ -395,20 +476,18 @@
       fname.className = "fname";
       fname.textContent = it.file.name;
 
-      
-
       const outname = document.createElement("div");
       outname.className = "outname";
-      outname.textContent = "";const badges = document.createElement("div");
+      outname.textContent = "";
+
+      const badges = document.createElement("div");
       badges.className = "badges";
 
-      // kind badge
       const bKind = document.createElement("span");
       bKind.className = "badge";
       bKind.textContent = it.kind.toUpperCase();
       badges.appendChild(bKind);
 
-      // info badges
       if(it.info){
         const bCS = document.createElement("span");
         bCS.className = "badge";
@@ -421,7 +500,6 @@
         badges.appendChild(bICC);
       }
 
-      // warnings
       for(const w of it.warnings){
         const b = document.createElement("span");
         b.className = "badge warn";
@@ -445,35 +523,6 @@
       return new Uint8Array(await file.arrayBuffer());
     }
 
-    async function tryAutoLoadProfiles(){
-      // 同梱運用したい場合：/profiles/ に置く
-      // ※ファイル名は必要に応じて変更OK（ここは「たたき台」）
-      const srgbPath = "profiles/sRGB IEC61966-2.1.icc";
-      const jpPath   = "profiles/JapanColor2001Coated.icc";
-
-      async function fetchU8(path){
-        const res = await fetch(path);
-        if(!res.ok) return null;
-        return new Uint8Array(await res.arrayBuffer());
-      }
-
-      const s = await fetchU8(srgbPath);
-      if(s) {
-        srgbProfile = new Magick.ColorProfile(s);
-        log("sRGB ICC auto loaded: " + srgbPath);
-      } else {
-        log("sRGB ICC not found at " + srgbPath + "（手動指定できます）");
-      }
-
-      const j = await fetchU8(jpPath);
-      if(j){
-        japanProfile = new Magick.ColorProfile(j);
-        log("Japan Color ICC auto loaded: " + jpPath);
-      } else {
-        log("Japan Color ICC not found at " + jpPath + "（手動指定できます）");
-      }
-    }
-
     async function setProfileFromInput(file, which){
       const u8 = await readFileAsU8(file);
       const prof = new Magick.ColorProfile(u8);
@@ -485,7 +534,6 @@
     function isPdf(file){
       return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
     }
-
     function isTiff(file){
       return file.type === "image/tiff" || /\.tiff?$/i.test(file.name);
     }
@@ -516,8 +564,6 @@
       const ctx = c.getContext("2d");
       ctx.fillStyle = color;
       ctx.fillRect(0, 0, w, h);
-
-      // optional label (subtle)
       if(labelText){
         ctx.fillStyle = "rgba(0,0,0,.35)";
         ctx.font = "bold 28px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, sans-serif";
@@ -528,18 +574,19 @@
       return c;
     }
 
-    function makeDummyThumbCanvas(){
-      // サムネはタイル枠に収まる程度でOK
-      return makeSolidCanvas(320, 180, "#b0b8bb", "DUMMY");
-    }
+    function makeDummyThumbCanvas(){ return makeSolidCanvas(320, 180, "#b0b8bb", "DUMMY"); }
+    function makeDummyExportCanvas(){ return makeSolidCanvas(TARGET_W, TARGET_H, "#b0b8bb", null); }
 
-    function makeDummyExportCanvas(){
-      // 出力用ダミー（#b0b8bb / 650x528）
-      return makeSolidCanvas(TARGET_W, TARGET_H, "#b0b8bb", null);
+    function containResizeDims(srcW, srcH, dstW, dstH){
+      const scale = Math.min(dstW / srcW, dstH / dstH);
+      const scale2 = Math.min(dstW / srcW, dstH / srcH);
+      return {
+        w: Math.max(1, Math.round(srcW * scale2)),
+        h: Math.max(1, Math.round(srcH * scale2)),
+      };
     }
 
     async function buildTiffThumbnailUrl(file){
-      // TIFFはブラウザの<img>で直接表示できないことが多いので、magick-wasmでサムネを作る
       const u8 = await readFileAsU8(file);
       return await Magick.ImageMagick.read(u8, async (img) => {
         try{
@@ -547,7 +594,6 @@
           img.backgroundColor = Magick.MagickColors.White;
           try{ img.alpha(Magick.AlphaAction.Remove); } catch {}
 
-          // サムネは軽量優先（見た目確認用）
           const MAX_W = 320;
           const MAX_H = 240;
           const dims = containResizeDims(img.width, img.height, MAX_W, MAX_H);
@@ -564,7 +610,6 @@
     }
 
     async function refreshTiffThumbnails(){
-      // 初期化前に投入されたTIFFを、初期化後にサムネ生成して差し替える
       const tasks = [];
       for(const it of items){
         if(it.kind !== "image") continue;
@@ -590,20 +635,15 @@
               }
             }
           } catch (e) {
-            // 失敗時はプレースホルダのまま
             if(!it.thumbCanvas) it.thumbCanvas = makePlaceholderCanvas("TIFF");
             if(!(it.warnings || []).includes("TIFFサムネ失敗")) it.warnings.push("TIFFサムネ失敗");
           }
         })());
       }
-      if(tasks.length){
-        await Promise.all(tasks);
-      }
+      if(tasks.length) await Promise.all(tasks);
     }
 
-
     async function buildPdfThumbnailAndInfo(file){
-      // 低負荷のサムネ用レンダリング
       const data = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data }).promise;
       const page = await pdf.getPage(1);
@@ -624,7 +664,6 @@
     }
 
     async function analyzeImageWithMagick(u8){
-      // サムネの警告表示用：colorspace / ICC有無だけ見る
       return await Magick.ImageMagick.read(u8, (img) => {
         try{
           const cs = img.colorSpace;
@@ -637,10 +676,8 @@
       });
     }
 
-
     function addDummy(){
       const id = crypto.randomUUID();
-      // Fileを実体として持たせる（名前表示用）。中身は空でOK（dummyは専用処理で書き出す）
       const file = new File([], "DUMMY", { type: "application/octet-stream" });
 
       const it = {
@@ -688,17 +725,14 @@
             it.thumbUrl = URL.createObjectURL(file);
           }
 
-          // magickで解析（CMYK検知など）
           try{
             const u8 = await readFileAsU8(file);
             it.info = await analyzeImageWithMagick(u8);
 
-            // CMYKなら警告（＝JapanColor→sRGB変換が必要）
             if(it.info.colorSpace === "CMYK" || it.info.colorSpace === "CMY"){
               it.warnings.push("CMYK入力");
               if(!japanProfile) it.warnings.push("JapanColor ICC未指定");
             } else {
-              // RGBでICC無しは警告（sRGB扱いにする）
               if(!it.info.hasIcc) it.warnings.push("ICCなし→sRGB扱い");
             }
           }catch(e){
@@ -719,11 +753,9 @@
       const pdf = await pdfjsLib.getDocument({ data }).promise;
       const page = await pdf.getPage(1);
 
-      // 出力に対して十分な解像を確保（2倍目安）
       const base = page.getViewport({ scale: 1 });
       let scale;
       if(use400){
-        // 幅400固定なので、幅基準で2倍程度
         scale = Math.max((W400 * 2) / base.width, 1);
       }else{
         scale = Math.max((TARGET_W * 2) / base.width, (TARGET_H * 2) / base.height);
@@ -739,33 +771,15 @@
       return canvas;
     }
 
-    function containResizeDims(srcW, srcH, dstW, dstH){
-      const scale = Math.min(dstW / srcW, dstH / srcH);
-      return {
-        w: Math.max(1, Math.round(srcW * scale)),
-        h: Math.max(1, Math.round(srcH * scale)),
-      };
-    }
-
     async function renderToJpegBytesFromMagickImage(img, kind, use400){
-      // kind: "image" | "pdf"
-      // 向き補正
       try { img.autoOrient(); } catch {}
-
-      // 透明は白で潰す
       img.backgroundColor = Magick.MagickColors.White;
       try { img.alpha(Magick.AlphaAction.Remove); } catch {}
 
-      // ---- 色管理（希望ルール）----
-      // sRGBプロファイルがないと「指定プロファイルとしての出力」ができないので警告
       const warnings = [];
-
-      if(!srgbProfile){
-        warnings.push("sRGB ICC未指定（出力はsRGB相当の可能性）");
-      }
+      if(!srgbProfile) warnings.push("sRGB ICC未指定（出力はsRGB相当の可能性）");
 
       if(kind === "pdf"){
-        // PDFは既にラスタ化済み（ブラウザ側色処理の影響を受ける可能性がある）
         if(srgbProfile) img.setProfile(srgbProfile);
       } else {
         const cs = img.colorSpace;
@@ -777,44 +791,35 @@
             img.setProfile(srgbProfile);
           } else {
             warnings.push("CMYKだがICC不足（JapanColor/sRGB）");
-            // 最低限：可能ならsRGBプロファイルだけ付ける（ただし厳密ではない）
             if(srgbProfile) img.setProfile(srgbProfile);
           }
         } else {
-          // RGB系
           if(srgbProfile){
-            const src = img.getColorProfile(); // embedded ICC
+            const src = img.getColorProfile();
             if(src){
               const ok = img.transformColorSpace(src, srgbProfile, Magick.ColorTransformMode.HighRes);
               if(!ok) warnings.push("ICC→sRGB変換失敗");
               img.setProfile(srgbProfile);
             } else {
-              // ICC無しは「sRGBとして扱う」運用（警告はタイル側で既に出している）
               img.setProfile(srgbProfile);
             }
           }
         }
       }
 
-      // ---- サイズ合わせ ----
       if(use400){
-        // 幅400固定（縦は比率でなりゆき）
         const w = W400;
         const h = Math.max(1, Math.round(img.height * (w / Math.max(1, img.width))));
         img.resize(w, h);
       }else{
-        // 650x528（トリミング無し / 白余白）
         const dims = containResizeDims(img.width, img.height, TARGET_W, TARGET_H);
         img.resize(dims.w, dims.h);
-        // 中央配置で 650x528 に extent
         img.extent(TARGET_W, TARGET_H, Magick.Gravity.Center, Magick.MagickColors.White);
       }
 
-      // ---- 出力設定 ----
       img.density = new Magick.Density(OUT_DPI, OUT_DPI, Magick.DensityUnit.PixelsPerInch);
       img.quality = OUT_QUALITY;
 
-      // JPEGで書き出し
       const outU8 = await magickWriteCopyU8(img, Magick.MagickFormat.Jpeg);
       return { outU8, warnings };
     }
@@ -822,11 +827,9 @@
     async function processOneToJpegU8(it){
       const use400 = !!it.use400;
       if(it.kind === "dummy"){
-        // ダミーは生成キャンバスから書き出す（必ずZIPに含める）
         const canvas = makeDummyExportCanvas();
         return await Magick.ImageMagick.readFromCanvas(canvas, async (img) => {
           try{
-            // 既に650x528だが、共通パスで確実に設定・出力する
             return await renderToJpegBytesFromMagickImage(img, "image", use400);
           } finally {
             img.dispose();
@@ -857,14 +860,8 @@
 
     async function exportZip(){
       const prefix = (elPrefix.value || "").trim();
-      if(!prefix){
-        alert("固定名（prefix）を入力してください");
-        return;
-      }
-      if(!magickReady){
-        alert("ImageMagickの初期化が完了していません");
-        return;
-      }
+      if(!prefix){ alert("固定名（prefix）を入力してください"); return; }
+      if(!magickReady){ alert("ImageMagickの初期化が完了していません"); return; }
 
       const digits = currentDigits();
       const startNo = currentStartNo();
@@ -879,7 +876,7 @@
 
         if(it.excluded){
           log("skip (excluded): " + it.file.name + " => " + pad(seq, digits));
-          continue; // 連番は詰めない（運用ルール）
+          continue;
         }
 
         try{
@@ -887,11 +884,8 @@
           const outName = `${prefix}${pad(seq, digits)}.jpg`;
           zip.file(outName, outU8, { binary: true });
 
-          if(warnings.length){
-            log("warn: " + outName + " / " + warnings.join(", "));
-          } else {
-            log("ok: " + outName);
-          }
+          if(warnings.length) log("warn: " + outName + " / " + warnings.join(", "));
+          else log("ok: " + outName);
         }catch(e){
           log("ERROR: " + it.file.name + " / " + (e?.message ?? e));
         }
@@ -908,7 +902,6 @@
     }
 
     function clearAll(){
-      // revoke object urls
       for(const it of items){
         if(it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
       }
@@ -932,18 +925,13 @@
     });
 
     // ---- sortable ----
+    let draggingId = null;
     new Sortable(elGrid, {
       group: { name: "grid", pull: true, put: true },
       animation: 150,
-      onChoose: (evt) => {
-        draggingId = evt?.item?.dataset?.id || null;
-      },
-      onUnchoose: () => {
-        draggingId = null;
-        elTrash?.classList.remove("hi");
-      },
+      onChoose: (evt) => { draggingId = evt?.item?.dataset?.id || null; },
+      onUnchoose: () => { draggingId = null; elTrash?.classList.remove("hi"); },
       onEnd: (evt) => {
-        // ゴミ箱上でドロップされた場合（dropイベントが拾えない環境の保険）
         try{
           const oe = evt?.originalEvent;
           if(oe && elTrash){
@@ -959,12 +947,10 @@
         log("reordered");
       }
     });
-    // ---- trash (drag here to delete) ----
-    const elTrash = document.getElementById("trash");
-    let draggingId = null;
 
-    // SortableJS uses native DnD. We just remember which card is being dragged,
-    // and delete it when dropped onto the trash area (without moving DOM into trash).
+    // ---- trash ----
+    const elTrash = document.getElementById("trash");
+
     elGrid.addEventListener("dragstart", (e) => {
       const card = e.target?.closest?.(".card");
       if(!card) return;
@@ -995,13 +981,9 @@
     }
 
     if(elTrash){
-      elTrash.addEventListener("dragenter", (e) => {
-        e.preventDefault();
-        elTrash.classList.add("hi");
-      });
+      elTrash.addEventListener("dragenter", (e) => { e.preventDefault(); elTrash.classList.add("hi"); });
       elTrash.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        elTrash.classList.add("hi");
+        e.preventDefault(); elTrash.classList.add("hi");
         try{ e.dataTransfer.dropEffect = "move"; }catch{}
       });
       elTrash.addEventListener("dragleave", (e) => {
@@ -1012,16 +994,11 @@
       elTrash.addEventListener("drop", (e) => {
         e.preventDefault();
         elTrash.classList.remove("hi");
-
-        // ignore dropping local files onto the trash area
         if(e.dataTransfer?.files && e.dataTransfer.files.length > 0) return;
-
         const id = (e.dataTransfer?.getData("text/plain") || draggingId || "").trim();
-        // wait a tick so Sortable finishes its end/cancel logic
         setTimeout(() => deleteCardById(id), 0);
       });
     }
-
 
     // ---- buttons ----
     elBtnDummy.addEventListener("click", ()=>{
@@ -1052,16 +1029,14 @@
       if(!ok) return;
       clearAll();
     });
+
     elPrefix.addEventListener("input", refreshSeqBadges);
     elStartNo.addEventListener("input", ()=>{
-      // 数字以外は落とす（上下カウントは不要なので直接入力前提）
       const v = (elStartNo.value || "").replace(/[^0-9]/g, "");
-      // 空は許容（入力途中）→ 表示側はcurrentStartNo()で1扱い
       elStartNo.value = v;
       refreshSeqBadges();
     });
     elStartNo.addEventListener("blur", ()=>{
-      // 入力確定時に最低1へ
       const n = parseInt(elStartNo.value || "1", 10);
       if(!Number.isFinite(n) || n < 1) elStartNo.value = "1";
       refreshSeqBadges();
@@ -1072,7 +1047,6 @@
       const f = elSrgbIcc.files?.[0];
       if(!f) return;
       await setProfileFromInput(f, "srgb");
-      // 既存タイルの警告を更新したい場合は、運用に合わせて再解析を追加してOK
     });
     elJapanIcc.addEventListener("change", async ()=>{
       const f = elJapanIcc.files?.[0];
@@ -1085,15 +1059,12 @@
       setStatus("ImageMagick 初期化中…");
       log("init magick-wasm...");
 
-      // magick.wasm のURLを指定して初期化
       await Magick.initializeImageMagick(new URL("https://cdn.jsdelivr.net/npm/@imagemagick/magick-wasm@0.0.37/dist/magick.wasm"));
 
       magickReady = true;
       setStatus("待機中（D&Dしてください）");
       log("magick-wasm ready.");
-      // profilesの自動ロードは行いません（GitHub Pages上で404ログが出るのを避けるため）。必要なら上のファイル選択で指定してください。
       await refreshTiffThumbnails();
-
       refreshSeqBadges();
     })().catch(err=>{
       setStatus("初期化失敗");
