@@ -578,11 +578,10 @@
     function makeDummyExportCanvas(){ return makeSolidCanvas(TARGET_W, TARGET_H, "#b0b8bb", null); }
 
     function containResizeDims(srcW, srcH, dstW, dstH){
-      const scale = Math.min(dstW / srcW, dstH / dstH);
-      const scale2 = Math.min(dstW / srcW, dstH / srcH);
+      const scale = Math.min(dstW / srcW, dstH / srcH);
       return {
-        w: Math.max(1, Math.round(srcW * scale2)),
-        h: Math.max(1, Math.round(srcH * scale2)),
+        w: Math.max(1, Math.round(srcW * scale)),
+        h: Math.max(1, Math.round(srcH * scale)),
       };
     }
 
