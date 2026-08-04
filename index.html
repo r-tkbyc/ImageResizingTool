@@ -48,7 +48,20 @@
     input[type="number"]{height:26px;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control2);color:var(--text)}
     #prefix{width:15ch}
     #startNo{width:6ch;text-align:right}
-    input[type="file"]{font-size:12px;color:var(--muted);width:300px;max-width:100%}
+    /* ICC指定欄：1行に2つ並べる。どちらのファイル名かが一目で分かるよう、
+       ラベル〜ファイル名までを1枚のパネルにまとめる（タイル上のバッジと同じ見た目）。
+       ネイティブのファイル名表示は隠し、名前は各パネル右端の1ヶ所だけに出す
+       （IndexedDB復元時と手動選択時で表示を一致させるため） */
+    .iccRow{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+    .iccGroup{position:relative;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:var(--radius);background:#2d2d2d;padding:4px 8px}
+    .iccGroup input[type="file"]{position:absolute;width:1px;height:1px;opacity:0}
+    .iccLabel{white-space:nowrap}
+    .fileBtn{height:22px;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control);color:var(--text);font-size:12px;display:inline-flex;align-items:center;cursor:pointer;white-space:nowrap}
+    .fileBtn:hover{background:var(--hover)}
+    .fileBtn:active{background:var(--active)}
+    .iccGroup input[type="file"]:focus-visible + .fileBtn{outline:1px solid var(--focus);outline-offset:1px}
+    .iccName{font-size:12px;color:var(--ok);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32ch}
+    .iccName.none{color:var(--muted)}
     button{height:26px;padding:0 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--control);color:var(--text);cursor:pointer}
     button:disabled{opacity:.5;cursor:not-allowed}
     button:hover{background:var(--hover)}
@@ -192,7 +205,7 @@
   </style>
 </head>
 <body>
-  <div class="ver">Ver_1.1.5</div>
+  <div class="ver">Ver_1.2.0</div>
 
   <div id="confirmOverlay" class="modal hidden" aria-hidden="true">
     <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMsg">
@@ -215,11 +228,19 @@
       <input id="startNo" type="text" inputmode="numeric" pattern="[0-9]*" value="1" />
     </div>
 
-    <div class="row">
-      <label>sRGB IEC61966-2.1</label>
-      <input id="srgbIcc" type="file" accept=".icc,.icm,application/octet-stream" />
-      <label>Japan Color 2001 Coated ICC</label>
-      <input id="japanIcc" type="file" accept=".icc,.icm,application/octet-stream" />
+    <div class="iccRow">
+      <span class="iccGroup">
+        <label class="iccLabel" for="srgbIcc">sRGB IEC61966-2.1</label>
+        <input id="srgbIcc" type="file" accept=".icc,.icm,application/octet-stream" />
+        <label class="fileBtn" for="srgbIcc">選択</label>
+        <span id="srgbIccName" class="iccName none">未指定</span>
+      </span>
+      <span class="iccGroup">
+        <label class="iccLabel" for="japanIcc">Japan Color 2001 Coated ICC</label>
+        <input id="japanIcc" type="file" accept=".icc,.icm,application/octet-stream" />
+        <label class="fileBtn" for="japanIcc">選択</label>
+        <span id="japanIccName" class="iccName none">未指定</span>
+      </span>
     </div>
 
     <div class="row">
@@ -238,7 +259,7 @@
         <span>投入後にタイル表示 → 並び替え → 除外チェック → ZIP出力</span>
       </div>
       <div class="footer">
-        <span class="small">出力: 650×528（白余白）/ 400w（高さ自動）/ Q100 / 144dpi / sRGB</span>
+        <span class="small">出力: 650×528 / 400×400（いずれも白余白・トリミング無し）/ Q100 / 144dpi / sRGB</span>
       </div>
     </div>
 
@@ -263,6 +284,7 @@
     const TARGET_W = 650;
     const TARGET_H = 528;
     const W400 = 400;
+    const H400 = 400;
     const OUT_DPI = 144;
     const OUT_QUALITY = 100;
 
@@ -350,6 +372,8 @@
 
     const elSrgbIcc = document.getElementById("srgbIcc");
     const elJapanIcc = document.getElementById("japanIcc");
+    const elSrgbIccName = document.getElementById("srgbIccName");
+    const elJapanIccName = document.getElementById("japanIccName");
 
     function log(msg){
       elLog.textContent += "\n" + msg;
@@ -382,7 +406,11 @@
     }
 
     function currentDigits(){
-      return items.length >= 100 ? 3 : 2;
+      // 除外しても連番を詰めない運用なので母数は「入力総数」。
+      // 開始番号がずれても桁が混ざらないよう、最終番号の桁数に合わせる（最低2桁）。
+      // 例: 開始50 / 60件 → 最終109 → 3桁（050〜109）
+      const lastNo = currentStartNo() + Math.max(0, items.length - 1);
+      return Math.max(2, String(lastNo).length);
     }
 
     function currentStartNo(){
@@ -448,6 +476,7 @@
       const opt400 = document.createElement("label");
       opt400.className = "opt400";
       opt400.innerHTML = "<input type=\"checkbox\" />400";
+      opt400.title = "400×400に収めて出力（白余白・トリミング無し）";
       const chk400 = opt400.querySelector("input");
       chk400.checked = !!it.use400;
       opt400.classList.toggle("on", chk400.checked);
@@ -523,12 +552,98 @@
       return new Uint8Array(await file.arrayBuffer());
     }
 
+    // ---- ICC永続化（IndexedDB）----
+    // ICCはリポジトリに同梱していないので、一度指定したものをブラウザ側に保存し、
+    // 次回以降は初期化時に自動復元する（毎回のファイル選択を省くため）。
+    const ICC_DB = "imageResizingTool";
+    const ICC_STORE = "profiles";
+
+    function iccDbOpen(){
+      return new Promise((resolve, reject)=>{
+        const req = indexedDB.open(ICC_DB, 1);
+        req.onupgradeneeded = ()=>{
+          const db = req.result;
+          if(!db.objectStoreNames.contains(ICC_STORE)) db.createObjectStore(ICC_STORE);
+        };
+        req.onsuccess = ()=>resolve(req.result);
+        req.onerror = ()=>reject(req.error);
+      });
+    }
+
+    async function iccDbPut(key, value){
+      const db = await iccDbOpen();
+      try{
+        await new Promise((resolve, reject)=>{
+          const tx = db.transaction(ICC_STORE, "readwrite");
+          tx.objectStore(ICC_STORE).put(value, key);
+          tx.oncomplete = ()=>resolve();
+          tx.onerror = ()=>reject(tx.error);
+          tx.onabort = ()=>reject(tx.error);
+        });
+      } finally {
+        db.close();
+      }
+    }
+
+    async function iccDbGet(key){
+      const db = await iccDbOpen();
+      try{
+        return await new Promise((resolve, reject)=>{
+          const tx = db.transaction(ICC_STORE, "readonly");
+          const req = tx.objectStore(ICC_STORE).get(key);
+          req.onsuccess = ()=>resolve(req.result ?? null);
+          req.onerror = ()=>reject(req.error);
+        });
+      } finally {
+        db.close();
+      }
+    }
+
+    function setIccNameLabel(which, name){
+      const el = which === "srgb" ? elSrgbIccName : elJapanIccName;
+      if(!el) return;
+      el.textContent = name ? "✓ " + name : "未指定";
+      el.classList.toggle("none", !name);
+    }
+
     async function setProfileFromInput(file, which){
       const u8 = await readFileAsU8(file);
       const prof = new Magick.ColorProfile(u8);
       if(which === "srgb") srgbProfile = prof;
       if(which === "japan") japanProfile = prof;
+      setIccNameLabel(which, file.name);
       log(which + " ICC loaded: " + file.name);
+
+      // 保存の失敗は致命的ではない（今回のセッションでは使える）
+      try{
+        await iccDbPut(which, { name: file.name, bytes: u8 });
+      }catch(e){
+        log(which + " ICC保存に失敗（次回は再指定が必要）: " + (e?.message ?? e));
+      }
+    }
+
+    async function restoreProfilesFromDb(){
+      // ※必ずImageMagick初期化後に呼ぶこと（ColorProfileの生成にwasmが要る）
+      for(const which of ["srgb", "japan"]){
+        // 手動指定済みなら上書きしない
+        if(which === "srgb" && srgbProfile) continue;
+        if(which === "japan" && japanProfile) continue;
+
+        try{
+          const rec = await iccDbGet(which);
+          if(!rec?.bytes) continue;
+
+          const prof = new Magick.ColorProfile(new Uint8Array(rec.bytes));
+          if(which === "srgb") srgbProfile = prof;
+          else japanProfile = prof;
+
+          const name = rec.name || "(保存済み)";
+          setIccNameLabel(which, name);
+          log(which + " ICC restored from IndexedDB: " + name);
+        }catch(e){
+          log(which + " ICC復元に失敗（手動で指定してください）: " + (e?.message ?? e));
+        }
+      }
     }
 
     function isPdf(file){
@@ -575,7 +690,12 @@
     }
 
     function makeDummyThumbCanvas(){ return makeSolidCanvas(320, 180, "#b0b8bb", "DUMMY"); }
-    function makeDummyExportCanvas(){ return makeSolidCanvas(TARGET_W, TARGET_H, "#b0b8bb", null); }
+    // 出力箱と同じ寸法で作らないと、後段のcontainフィットで白帯が入り「べた塗り」でなくなる
+    function makeDummyExportCanvas(use400){
+      return use400
+        ? makeSolidCanvas(W400, H400, "#b0b8bb", null)
+        : makeSolidCanvas(TARGET_W, TARGET_H, "#b0b8bb", null);
+    }
 
     function containResizeDims(srcW, srcH, dstW, dstH){
       const scale = Math.min(dstW / srcW, dstH / srcH);
@@ -752,13 +872,12 @@
       const pdf = await pdfjsLib.getDocument({ data }).promise;
       const page = await pdf.getPage(1);
 
+      // 400も650x528と同じ「箱に収める」方式なので、縦横どちらも足りるscaleにする
+      const boxW = use400 ? W400 : TARGET_W;
+      const boxH = use400 ? H400 : TARGET_H;
+
       const base = page.getViewport({ scale: 1 });
-      let scale;
-      if(use400){
-        scale = Math.max((W400 * 2) / base.width, 1);
-      }else{
-        scale = Math.max((TARGET_W * 2) / base.width, (TARGET_H * 2) / base.height);
-      }
+      const scale = Math.max((boxW * 2) / base.width, (boxH * 2) / base.height);
       const viewport = page.getViewport({ scale });
 
       const canvas = document.createElement("canvas");
@@ -806,15 +925,15 @@
         }
       }
 
-      if(use400){
-        const w = W400;
-        const h = Math.max(1, Math.round(img.height * (w / Math.max(1, img.width))));
-        img.resize(w, h);
-      }else{
-        const dims = containResizeDims(img.width, img.height, TARGET_W, TARGET_H);
-        img.resize(dims.w, dims.h);
-        img.extent(TARGET_W, TARGET_H, Magick.Gravity.Center, Magick.MagickColors.White);
-      }
+      // 400ON: 400x400 / 400OFF: 650x528
+      // どちらも「箱にトリミング無しで収める → 白余白で中央配置」で扱いは同じ。
+      // 箱より小さい画像は拡大する（containResizeDimsは縮小に限定していない）。
+      const boxW = use400 ? W400 : TARGET_W;
+      const boxH = use400 ? H400 : TARGET_H;
+
+      const dims = containResizeDims(img.width, img.height, boxW, boxH);
+      img.resize(dims.w, dims.h);
+      img.extent(boxW, boxH, Magick.Gravity.Center, Magick.MagickColors.White);
 
       img.density = new Magick.Density(OUT_DPI, OUT_DPI, Magick.DensityUnit.PixelsPerInch);
       img.quality = OUT_QUALITY;
@@ -826,7 +945,7 @@
     async function processOneToJpegU8(it){
       const use400 = !!it.use400;
       if(it.kind === "dummy"){
-        const canvas = makeDummyExportCanvas();
+        const canvas = makeDummyExportCanvas(use400);
         return await Magick.ImageMagick.readFromCanvas(canvas, async (img) => {
           try{
             return await renderToJpegBytesFromMagickImage(img, "image", use400);
@@ -1042,16 +1161,21 @@
     });
 
     // ---- icc inputs ----
-    elSrgbIcc.addEventListener("change", async ()=>{
-      const f = elSrgbIcc.files?.[0];
+    async function onIccPicked(input, which){
+      const f = input.files?.[0];
       if(!f) return;
-      await setProfileFromInput(f, "srgb");
-    });
-    elJapanIcc.addEventListener("change", async ()=>{
-      const f = elJapanIcc.files?.[0];
-      if(!f) return;
-      await setProfileFromInput(f, "japan");
-    });
+      if(!magickReady){
+        log("ImageMagick初期化前のためICCを読み込めません（初期化後に再指定してください）");
+        return;
+      }
+      try{
+        await setProfileFromInput(f, which);
+      }catch(e){
+        log(which + " ICC読み込みに失敗: " + (e?.message ?? e));
+      }
+    }
+    elSrgbIcc.addEventListener("change", ()=>onIccPicked(elSrgbIcc, "srgb"));
+    elJapanIcc.addEventListener("change", ()=>onIccPicked(elJapanIcc, "japan"));
 
     // ---- init ----
     (async ()=>{
@@ -1063,6 +1187,8 @@
       magickReady = true;
       setStatus("待機中（D&Dしてください）");
       log("magick-wasm ready.");
+      // ICCはリポジトリに同梱していないため、前回指定したものをIndexedDBから復元する
+      await restoreProfilesFromDb();
       await refreshTiffThumbnails();
       refreshSeqBadges();
     })().catch(err=>{
